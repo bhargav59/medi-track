@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+
+# Database (auto-created at runtime)
+medi_store.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

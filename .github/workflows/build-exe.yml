@@ -1,0 +1,48 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flet pyinstaller
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --name "MediTrackNepal" `
+            --onedir `
+            --windowed `
+            --add-data "views;views" `
+            --hidden-import flet `
+            --hidden-import flet_desktop `
+            --hidden-import views.dashboard `
+            --hidden-import views.inventory `
+            --hidden-import views.pos `
+            --hidden-import views.reports `
+            --hidden-import views.suppliers `
+            --icon NONE `
+            --clean `
+            main.py
+
+      - name: Upload EXE as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MediTrackNepal-Windows
+          path: dist/MediTrackNepal/
+          retention-days: 30
