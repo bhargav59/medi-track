@@ -3,10 +3,10 @@ views/inventory.py — Module B: Inventory & Stock-In
 =====================================================
 Features:
   • Add new products or search existing ones.
-  • Stock-in form: Name, Batch No, MFG, EXP, QTY, CP, MRP, SP.
-  • Live margin calculation: (SP − CP) / SP × 100.
+  • Stock-in form: Name, Batch No, MFG, EXP, QTY, CP, MRP.
+  • Calendar date pickers for MFG and EXP dates.
   • Validation: Expiry Date must be after Manufacturing Date.
-  • Current stock listing with product details.
+  • SP is NOT set here — it's set at POS during sale.
 """
 
 import flet as ft
@@ -60,13 +60,42 @@ class InventoryView(ft.Column):
 
         # --- Stock-in fields ---
         self.batch_no = ft.TextField(label="Batch No", border_radius=8)
-        self.mfg_date = ft.TextField(label="MFG Date (DD/MM/YYYY)", border_radius=8, hint_text="e.g. 01/01/2025")
-        self.exp_date = ft.TextField(label="EXP Date (DD/MM/YYYY)", border_radius=8, hint_text="e.g. 01/01/2027")
+
+        # MFG date with calendar picker
+        self.mfg_date_display = ft.TextField(
+            label="MFG Date", read_only=True, border_radius=8,
+            hint_text="Select date…", expand=True,
+        )
+        self.mfg_date_picker = ft.DatePicker(
+            first_date=datetime(2000, 1, 1),
+            last_date=datetime(2050, 12, 31),
+            on_change=self._on_mfg_date_picked,
+        )
+        self.mfg_date_btn = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Pick MFG Date",
+            on_click=self._open_mfg_picker,
+        )
+
+        # EXP date with calendar picker
+        self.exp_date_display = ft.TextField(
+            label="EXP Date", read_only=True, border_radius=8,
+            hint_text="Select date…", expand=True,
+        )
+        self.exp_date_picker = ft.DatePicker(
+            first_date=datetime(2000, 1, 1),
+            last_date=datetime(2050, 12, 31),
+            on_change=self._on_exp_date_picked,
+        )
+        self.exp_date_btn = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Pick EXP Date",
+            on_click=self._open_exp_picker,
+        )
+
         self.qty = ft.TextField(label="Quantity", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
-        self.cp = ft.TextField(label="Cost Price (CP)", keyboard_type=ft.KeyboardType.NUMBER, on_change=self._calc_margin, border_radius=8)
+        self.cp = ft.TextField(label="Cost Price (CP)", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
         self.mrp = ft.TextField(label="MRP", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
-        self.sp = ft.TextField(label="Selling Price (SP)", keyboard_type=ft.KeyboardType.NUMBER, on_change=self._calc_margin, border_radius=8)
-        self.margin_text = ft.Text("Margin: —", size=15, weight=ft.FontWeight.W_600, color=ft.Colors.GREEN_700)
 
         self.supplier_dropdown = ft.Dropdown(
             label="Supplier (optional)", options=[], width=400, border_radius=8,
@@ -85,7 +114,7 @@ class InventoryView(ft.Column):
             ),
         )
 
-        # --- Stock table ---
+        # --- Stock table (no SP column) ---
         self.stock_table = ft.DataTable(
             columns=[
                 ft.DataColumn(ft.Text("Product", weight=ft.FontWeight.W_600, size=12)),
@@ -95,7 +124,6 @@ class InventoryView(ft.Column):
                 ft.DataColumn(ft.Text("Qty", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("CP", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("MRP", weight=ft.FontWeight.W_600, size=12), numeric=True),
-                ft.DataColumn(ft.Text("SP", weight=ft.FontWeight.W_600, size=12), numeric=True),
             ],
             rows=[],
             border=ft.border.all(1, ft.Colors.GREY_300),
@@ -104,24 +132,52 @@ class InventoryView(ft.Column):
             column_spacing=18,
         )
 
+        # Internal state for picked dates (ISO format)
+        self._mfg_iso = ""
+        self._exp_iso = ""
+
     def did_mount(self):
+        # Register date pickers with the page overlay
+        self._page_ref.overlay.append(self.mfg_date_picker)
+        self._page_ref.overlay.append(self.exp_date_picker)
+        self._page_ref.update()
         self._load_data()
+
+    # ---- Calendar picker handlers ----
+    def _open_mfg_picker(self, e):
+        self.mfg_date_picker.open = True
+        self._page_ref.update()
+
+    def _on_mfg_date_picked(self, e):
+        if e.control.value:
+            dt = e.control.value
+            self._mfg_iso = dt.strftime("%Y-%m-%d")
+            self.mfg_date_display.value = dt.strftime("%d/%m/%Y")
+            self.mfg_date_display.update()
+
+    def _open_exp_picker(self, e):
+        self.exp_date_picker.open = True
+        self._page_ref.update()
+
+    def _on_exp_date_picked(self, e):
+        if e.control.value:
+            dt = e.control.value
+            self._exp_iso = dt.strftime("%Y-%m-%d")
+            self.exp_date_display.value = dt.strftime("%d/%m/%Y")
+            self.exp_date_display.update()
 
     def _load_data(self):
         """Reload products, suppliers, and stock list."""
-        # Products dropdown
         products = get_all_products()
         self.product_dropdown.options = [
             ft.dropdown.Option(key=str(p["id"]), text=p["name"]) for p in products
         ]
 
-        # Suppliers dropdown
         suppliers = get_all_suppliers()
         self.supplier_dropdown.options = [
             ft.dropdown.Option(key=str(s["id"]), text=s["name"]) for s in suppliers
         ]
 
-        # Stock table
         stock = get_all_stock()
         self.stock_table.rows = [
             ft.DataRow(cells=[
@@ -132,7 +188,6 @@ class InventoryView(ft.Column):
                 ft.DataCell(ft.Text(str(s.get("qty", 0)), size=12)),
                 ft.DataCell(ft.Text(f"Rs. {s.get('cp', 0):.2f}", size=12)),
                 ft.DataCell(ft.Text(f"Rs. {s.get('mrp', 0):.2f}", size=12)),
-                ft.DataCell(ft.Text(f"Rs. {s.get('sp', 0):.2f}", size=12)),
             ])
             for s in stock
         ]
@@ -142,6 +197,10 @@ class InventoryView(ft.Column):
 
     def _build_controls(self):
         """Assemble all controls into the view."""
+        # Date picker rows with calendar buttons
+        mfg_row = ft.Row([self.mfg_date_display, self.mfg_date_btn], spacing=4)
+        exp_row = ft.Row([self.exp_date_display, self.exp_date_btn], spacing=4)
+
         form_card = ft.Container(
             content=ft.Column([
                 ft.Text("Add Stock", size=20, weight=ft.FontWeight.BOLD),
@@ -155,9 +214,8 @@ class InventoryView(ft.Column):
                 self.add_product_btn,
                 ft.Divider(height=1),
                 ft.Row([self.batch_no, self.qty], spacing=12),
-                ft.Row([self.mfg_date, self.exp_date], spacing=12),
-                ft.Row([self.cp, self.mrp, self.sp], spacing=12),
-                self.margin_text,
+                ft.Row([mfg_row, exp_row], spacing=12),
+                ft.Row([self.cp, self.mrp], spacing=12),
                 self.supplier_dropdown,
                 ft.Row([self.add_stock_btn, self.status_text], spacing=12),
             ], spacing=12),
@@ -222,23 +280,8 @@ class InventoryView(ft.Column):
         self.product_dropdown.value = str(pid)
         self.status_text.value = f"✅ Product '{name}' created."
         self.status_text.color = ft.Colors.GREEN_700
-        # Hide add-new section
         self._toggle_new_product(None)
         self.update()
-
-    def _calc_margin(self, e):
-        try:
-            cp = float(self.cp.value or 0)
-            sp = float(self.sp.value or 0)
-            if sp > 0:
-                margin = ((sp - cp) / sp) * 100
-                self.margin_text.value = f"Margin: {margin:.1f}%"
-                self.margin_text.color = ft.Colors.GREEN_700 if margin >= 0 else ft.Colors.RED_700
-            else:
-                self.margin_text.value = "Margin: —"
-        except ValueError:
-            self.margin_text.value = "Margin: —"
-        self.margin_text.update()
 
     def _add_stock(self, e):
         """Validate inputs and add a stock entry."""
@@ -250,29 +293,10 @@ class InventoryView(ft.Column):
             return
 
         # Validate dates
-        mfg_str = self.mfg_date.value.strip()
-        exp_str = self.exp_date.value.strip()
-        mfg_iso, exp_iso = "", ""
-        if mfg_str:
-            try:
-                mfg_dt = datetime.strptime(mfg_str, "%d/%m/%Y")
-                mfg_iso = mfg_dt.strftime("%Y-%m-%d")
-            except ValueError:
-                self.status_text.value = "❌ MFG date format must be DD/MM/YYYY."
-                self.status_text.color = ft.Colors.RED_700
-                self.status_text.update()
-                return
-        if exp_str:
-            try:
-                exp_dt = datetime.strptime(exp_str, "%d/%m/%Y")
-                exp_iso = exp_dt.strftime("%Y-%m-%d")
-            except ValueError:
-                self.status_text.value = "❌ EXP date format must be DD/MM/YYYY."
-                self.status_text.color = ft.Colors.RED_700
-                self.status_text.update()
-                return
+        mfg_iso = self._mfg_iso
+        exp_iso = self._exp_iso
 
-        if mfg_str and exp_str and exp_iso <= mfg_iso:
+        if mfg_iso and exp_iso and exp_iso <= mfg_iso:
             self.status_text.value = "❌ Expiry date must be after manufacturing date."
             self.status_text.color = ft.Colors.RED_700
             self.status_text.update()
@@ -282,15 +306,15 @@ class InventoryView(ft.Column):
             qty_val = int(self.qty.value or 0)
             cp_val = float(self.cp.value or 0)
             mrp_val = float(self.mrp.value or 0)
-            sp_val = float(self.sp.value or 0)
         except ValueError:
-            self.status_text.value = "❌ Quantity, CP, MRP, SP must be valid numbers."
+            self.status_text.value = "❌ Quantity, CP, MRP must be valid numbers."
             self.status_text.color = ft.Colors.RED_700
             self.status_text.update()
             return
 
         sup_id = int(self.supplier_dropdown.value) if self.supplier_dropdown.value else None
 
+        # SP defaults to 0 — will be set at POS during sale
         add_stock(
             product_id=int(pid),
             batch_no=self.batch_no.value.strip(),
@@ -299,7 +323,7 @@ class InventoryView(ft.Column):
             qty=qty_val,
             cp=cp_val,
             mrp=mrp_val,
-            sp=sp_val,
+            sp=0.0,
             supplier_id=sup_id,
         )
 
@@ -307,8 +331,11 @@ class InventoryView(ft.Column):
         self.status_text.color = ft.Colors.GREEN_700
 
         # Clear fields
-        for field in [self.batch_no, self.mfg_date, self.exp_date, self.qty, self.cp, self.mrp, self.sp]:
+        for field in [self.batch_no, self.qty, self.cp, self.mrp]:
             field.value = ""
-        self.margin_text.value = "Margin: —"
+        self.mfg_date_display.value = ""
+        self.exp_date_display.value = ""
+        self._mfg_iso = ""
+        self._exp_iso = ""
 
         self._load_data()

@@ -84,6 +84,12 @@ def initialize_database():
             FOREIGN KEY (sale_id)  REFERENCES Sales(id),
             FOREIGN KEY (stock_id) REFERENCES Stock(id)
         );
+
+        CREATE TABLE IF NOT EXISTS ShopSettings (
+            id          INTEGER PRIMARY KEY CHECK (id = 1),
+            shop_name   TEXT    DEFAULT 'Medical Store',
+            logo_path   TEXT    DEFAULT ''
+        );
     """)
 
     conn.commit()
@@ -439,3 +445,38 @@ def get_expiry_audit(start_date, end_date):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ============================= SHOP SETTINGS ================================
+
+def get_shop_settings():
+    """Return shop settings dict (shop_name, logo_path). Creates default if missing."""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
+    if not row:
+        conn.execute(
+            "INSERT INTO ShopSettings (id, shop_name, logo_path) VALUES (1, 'Medical Store', '')"
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
+    conn.close()
+    return dict(row)
+
+
+def save_shop_settings(shop_name, logo_path):
+    """Update shop name and logo path."""
+    conn = get_connection()
+    # Upsert: insert or replace
+    existing = conn.execute("SELECT id FROM ShopSettings WHERE id = 1").fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE ShopSettings SET shop_name = ?, logo_path = ? WHERE id = 1",
+            (shop_name, logo_path),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO ShopSettings (id, shop_name, logo_path) VALUES (1, ?, ?)",
+            (shop_name, logo_path),
+        )
+    conn.commit()
+    conn.close()

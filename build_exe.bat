@@ -47,6 +47,7 @@ pyinstaller --name "MediTrackNepal" ^
     --hidden-import views.pos ^
     --hidden-import views.reports ^
     --hidden-import views.suppliers ^
+    --hidden-import views.settings ^
     --clean ^
     main.py
 

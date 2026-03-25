@@ -16,6 +16,7 @@ from views.inventory import InventoryView
 from views.pos import POSView
 from views.reports import ReportsView
 from views.suppliers import SuppliersView
+from views.settings import SettingsView
 
 
 def main(page: ft.Page):
@@ -49,6 +50,8 @@ def main(page: ft.Page):
                 views[index] = ReportsView(page)
             elif index == 4:
                 views[index] = SuppliersView(page)
+            elif index == 5:
+                views[index] = SettingsView(page)
         return views[index]
 
     # ---- Content area ----
@@ -102,6 +105,11 @@ def main(page: ft.Page):
                 icon=ft.Icons.LOCAL_SHIPPING_OUTLINED,
                 selected_icon=ft.Icons.LOCAL_SHIPPING,
                 label="Suppliers",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.SETTINGS_OUTLINED,
+                selected_icon=ft.Icons.SETTINGS,
+                label="Settings",
             ),
         ],
     )

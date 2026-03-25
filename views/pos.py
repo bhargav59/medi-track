@@ -3,18 +3,24 @@ views/pos.py — Module C: Point of Sale (POS)
 ==============================================
 Features:
   • Instant search bar for products (by name or batch).
-  • Cart system that validates stock availability.
+  • Cart system with editable selling price (SP set at sale time).
+  • Payment options: Cash, Credit, Online.
   • Complete Sale: auto-subtracts stock, generates bill number.
-  • Print-ready bill view (text-based for thermal printers).
+  • Print-ready bill with shop name & logo (HTML for printing).
 """
 
 import flet as ft
+import os
+import base64
+import tempfile
+import webbrowser
 from datetime import datetime
 from db_manager import (
     search_stock,
     generate_bill_no,
     create_sale,
     get_sale_with_items,
+    get_shop_settings,
 )
 
 
@@ -28,7 +34,7 @@ class POSView(ft.Column):
         self.scroll = ft.ScrollMode.AUTO
         self.spacing = 20
 
-        # Internal cart: list of dicts {stock_id, product_name, batch_no, qty, unit_price, max_qty}
+        # Internal cart: list of dicts {stock_id, product_name, batch_no, qty, unit_price, max_qty, mrp}
         self.cart: list[dict] = []
 
         # --- Search ---
@@ -49,7 +55,8 @@ class POSView(ft.Column):
             columns=[
                 ft.DataColumn(ft.Text("Product", weight=ft.FontWeight.W_600, size=12)),
                 ft.DataColumn(ft.Text("Batch", weight=ft.FontWeight.W_600, size=12)),
-                ft.DataColumn(ft.Text("Price", weight=ft.FontWeight.W_600, size=12), numeric=True),
+                ft.DataColumn(ft.Text("MRP", weight=ft.FontWeight.W_600, size=12), numeric=True),
+                ft.DataColumn(ft.Text("Sell Price", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("Qty", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("Total", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("", size=12)),
@@ -58,7 +65,7 @@ class POSView(ft.Column):
             border=ft.border.all(1, ft.Colors.GREY_300),
             border_radius=8,
             heading_row_color=ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
-            column_spacing=20,
+            column_spacing=16,
         )
 
         # --- Totals ---
@@ -75,7 +82,7 @@ class POSView(ft.Column):
             options=[
                 ft.dropdown.Option("Cash"),
                 ft.dropdown.Option("Credit"),
-                ft.dropdown.Option("UPI"),
+                ft.dropdown.Option("Online"),
             ],
         )
 
@@ -98,8 +105,9 @@ class POSView(ft.Column):
 
         self.status_text = ft.Text("", size=13)
 
-        # --- Bill preview ---
+        # --- Bill preview + print ---
         self.bill_preview = ft.Container(visible=False)
+        self._last_sale_id = None
 
     def did_mount(self):
         self._build_controls()
@@ -161,7 +169,7 @@ class POSView(ft.Column):
                     ft.Text(f"{r['product_name']}", weight=ft.FontWeight.W_600, size=13, expand=True),
                     ft.Text(f"Batch: {r['batch_no']}", size=12, color=ft.Colors.GREY_600),
                     ft.Text(f"Qty: {r['qty']}", size=12, color=ft.Colors.GREY_600),
-                    ft.Text(f"Rs. {r['sp']:.2f}", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.BLUE_700),
+                    ft.Text(f"MRP: Rs. {r['mrp']:.2f}", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.BLUE_700),
                     ft.IconButton(
                         icon=ft.Icons.ADD_CIRCLE,
                         icon_color=ft.Colors.GREEN_700,
@@ -183,7 +191,7 @@ class POSView(ft.Column):
         self.search_results.update()
 
     def _add_to_cart(self, e):
-        """Add a stock item to the cart (qty=1 by default)."""
+        """Add a stock item to the cart (qty=1, price=MRP by default)."""
         r = e.control.data
         # Check if already in cart
         for item in self.cart:
@@ -197,12 +205,14 @@ class POSView(ft.Column):
                     self.status_text.update()
                 return
 
+        # Default sell price = MRP (user can edit in cart)
         self.cart.append({
             "stock_id": r["id"],
             "product_name": r["product_name"],
             "batch_no": r["batch_no"],
             "qty": 1,
-            "unit_price": r["sp"],
+            "unit_price": r["mrp"],  # Editable by user
+            "mrp": r["mrp"],
             "max_qty": r["qty"],
         })
         self._refresh_cart_ui()
@@ -212,10 +222,25 @@ class POSView(ft.Column):
         rows = []
         for i, item in enumerate(self.cart):
             line_total = item["qty"] * item["unit_price"]
+
+            # Editable sell price field
+            price_field = ft.TextField(
+                value=f"{item['unit_price']:.2f}",
+                width=90,
+                text_size=12,
+                content_padding=ft.padding.symmetric(horizontal=8, vertical=4),
+                border_radius=6,
+                keyboard_type=ft.KeyboardType.NUMBER,
+                data=i,
+                on_blur=self._on_price_change,
+                on_submit=self._on_price_change,
+            )
+
             rows.append(ft.DataRow(cells=[
                 ft.DataCell(ft.Text(item["product_name"], size=12)),
                 ft.DataCell(ft.Text(item["batch_no"], size=12)),
-                ft.DataCell(ft.Text(f"Rs. {item['unit_price']:.2f}", size=12)),
+                ft.DataCell(ft.Text(f"Rs. {item['mrp']:.2f}", size=12, color=ft.Colors.GREY_600)),
+                ft.DataCell(price_field),
                 ft.DataCell(ft.Row([
                     ft.IconButton(ft.Icons.REMOVE_CIRCLE_OUTLINE, icon_size=18,
                                   data=i, on_click=self._dec_qty, tooltip="Decrease"),
@@ -232,6 +257,17 @@ class POSView(ft.Column):
         self.cart_table.rows = rows
         self._update_totals_display(None)
         self.update()
+
+    def _on_price_change(self, e):
+        """Update sell price when user edits it in the cart."""
+        idx = e.control.data
+        try:
+            new_price = float(e.control.value or 0)
+            self.cart[idx]["unit_price"] = new_price
+            self._update_totals_display(None)
+            self.update()
+        except (ValueError, IndexError):
+            pass
 
     def _inc_qty(self, e):
         idx = e.control.data
@@ -294,8 +330,9 @@ class POSView(ft.Column):
         ]
 
         sale_id = create_sale(bill_no, subtotal, discount, grand_total, pay_type, items_for_db)
+        self._last_sale_id = sale_id
 
-        # Generate text-based bill
+        # Generate bill preview
         self._show_bill(sale_id)
 
         self.cart.clear()
@@ -304,15 +341,17 @@ class POSView(ft.Column):
         self._refresh_cart_ui()
 
     def _show_bill(self, sale_id):
-        """Render a print-ready text bill."""
+        """Render a bill preview with print button."""
         sale = get_sale_with_items(sale_id)
         if not sale:
             return
 
+        settings = get_shop_settings()
+        shop_name = settings.get("shop_name", "Medical Store")
+
         lines = []
         lines.append("=" * 44)
-        lines.append("         MEDI-TRACK NEPAL")
-        lines.append("       Medical Store Receipt")
+        lines.append(f"  {shop_name.upper()}")
         lines.append("=" * 44)
         lines.append(f"Bill No  : {sale['bill_no']}")
         lines.append(f"Date     : {sale['timestamp']}")
@@ -333,8 +372,23 @@ class POSView(ft.Column):
         lines.append("=" * 44)
 
         bill_text = "\n".join(lines)
+
+        print_btn = ft.ElevatedButton(
+            "🖨 Print Bill",
+            icon=ft.Icons.PRINT,
+            on_click=lambda _: self._print_bill(sale_id),
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.BLUE_700,
+                color=ft.Colors.WHITE,
+                shape=ft.RoundedRectangleBorder(radius=8),
+            ),
+        )
+
         self.bill_preview.content = ft.Column([
-            ft.Text("Receipt Preview", size=18, weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.Text("Receipt Preview", size=18, weight=ft.FontWeight.BOLD),
+                print_btn,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Container(
                 content=ft.Text(bill_text, font_family="Courier New, monospace", size=12),
                 padding=16,
@@ -345,3 +399,95 @@ class POSView(ft.Column):
         ], spacing=8)
         self.bill_preview.visible = True
         self.bill_preview.update()
+
+    def _print_bill(self, sale_id):
+        """Generate an HTML receipt and open it in the browser for printing."""
+        sale = get_sale_with_items(sale_id)
+        if not sale:
+            return
+
+        settings = get_shop_settings()
+        shop_name = settings.get("shop_name", "Medical Store")
+        logo_path = settings.get("logo_path", "")
+
+        # Build logo HTML
+        logo_html = ""
+        if logo_path and os.path.exists(logo_path):
+            try:
+                with open(logo_path, "rb") as f:
+                    logo_data = base64.b64encode(f.read()).decode()
+                ext = os.path.splitext(logo_path)[1].lower()
+                mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "svg": "image/svg+xml"}.get(ext.lstrip("."), "image/png")
+                logo_html = f'<img src="data:{mime};base64,{logo_data}" style="max-height:60px;margin-bottom:8px;" /><br/>'
+            except Exception:
+                pass
+
+        # Build items HTML
+        items_html = ""
+        for item in sale["items"]:
+            total = item["qty"] * item["unit_price"]
+            items_html += f"""
+            <tr>
+                <td style="text-align:left;padding:4px 8px;">{item['product_name']}</td>
+                <td style="text-align:center;padding:4px 8px;">{item['qty']}</td>
+                <td style="text-align:right;padding:4px 8px;">Rs. {item['unit_price']:.2f}</td>
+                <td style="text-align:right;padding:4px 8px;">Rs. {total:.2f}</td>
+            </tr>"""
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Receipt - {sale['bill_no']}</title>
+    <style>
+        body {{ font-family: 'Courier New', monospace; max-width: 380px; margin: 0 auto; padding: 20px; font-size: 13px; }}
+        .header {{ text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }}
+        .header h2 {{ margin: 4px 0; font-size: 18px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th {{ border-bottom: 1px solid #000; padding: 4px 8px; font-size: 12px; }}
+        .totals td {{ padding: 2px 8px; }}
+        .totals .grand {{ font-weight: bold; font-size: 15px; border-top: 2px solid #000; }}
+        .footer {{ text-align: center; margin-top: 16px; border-top: 2px solid #000; padding-top: 10px; }}
+        @media print {{ body {{ margin: 0; padding: 5px; }} }}
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="header">
+        {logo_html}
+        <h2>{shop_name}</h2>
+    </div>
+    <div style="margin-bottom:10px;">
+        <strong>Bill No:</strong> {sale['bill_no']}<br/>
+        <strong>Date:</strong> {sale['timestamp']}<br/>
+        <strong>Payment:</strong> {sale['payment_type']}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="text-align:left;">Item</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;">Price</th>
+                <th style="text-align:right;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {items_html}
+        </tbody>
+    </table>
+    <table class="totals" style="margin-top:10px;">
+        <tr><td style="text-align:right;" colspan="3">Subtotal</td><td style="text-align:right;">Rs. {sale['subtotal']:.2f}</td></tr>
+        <tr><td style="text-align:right;" colspan="3">Discount</td><td style="text-align:right;">Rs. {sale['discount']:.2f}</td></tr>
+        <tr class="grand"><td style="text-align:right;" colspan="3">GRAND TOTAL</td><td style="text-align:right;">Rs. {sale['grand_total']:.2f}</td></tr>
+    </table>
+    <div class="footer">
+        Thank you for shopping!
+    </div>
+</body>
+</html>"""
+
+        # Write to temp file and open in browser
+        tmp_file = os.path.join(tempfile.gettempdir(), f"receipt_{sale['bill_no']}.html")
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        webbrowser.open(f"file://{tmp_file}")

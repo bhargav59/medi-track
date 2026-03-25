@@ -2,7 +2,7 @@
 views/reports.py — Module D: Reporting
 ========================================
 Features:
-  • Monthly Sales Report: filter by date range, see bill totals.
+  • Monthly Sales Report: filter by date range (calendar pickers), see bill totals.
   • Expiry Audit: filter by date range to find items to return to suppliers.
 """
 
@@ -25,15 +25,42 @@ class ReportsView(ft.Column):
         today = datetime.now()
         first_of_month = today.replace(day=1)
 
-        self.start_date = ft.TextField(
-            label="Start Date (DD/MM/YYYY)",
+        # Start date with calendar picker
+        self.start_date_display = ft.TextField(
+            label="Start Date",
             value=first_of_month.strftime("%d/%m/%Y"),
-            width=200, border_radius=8,
+            read_only=True, width=180, border_radius=8,
         )
-        self.end_date = ft.TextField(
-            label="End Date (DD/MM/YYYY)",
+        self._start_iso = first_of_month.strftime("%Y-%m-%d")
+        self.start_date_picker = ft.DatePicker(
+            value=first_of_month,
+            first_date=datetime(2020, 1, 1),
+            last_date=datetime(2050, 12, 31),
+            on_change=self._on_start_picked,
+        )
+        self.start_date_btn = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Pick Start Date",
+            on_click=self._open_start_picker,
+        )
+
+        # End date with calendar picker
+        self.end_date_display = ft.TextField(
+            label="End Date",
             value=today.strftime("%d/%m/%Y"),
-            width=200, border_radius=8,
+            read_only=True, width=180, border_radius=8,
+        )
+        self._end_iso = today.strftime("%Y-%m-%d")
+        self.end_date_picker = ft.DatePicker(
+            value=today,
+            first_date=datetime(2020, 1, 1),
+            last_date=datetime(2050, 12, 31),
+            on_change=self._on_end_picked,
+        )
+        self.end_date_btn = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Pick End Date",
+            on_click=self._open_end_picker,
         )
 
         self.sales_btn = ft.ElevatedButton(
@@ -53,13 +80,43 @@ class ReportsView(ft.Column):
         self.status_text = ft.Text("", size=13)
 
     def did_mount(self):
+        # Register date pickers with the page overlay
+        self._page_ref.overlay.append(self.start_date_picker)
+        self._page_ref.overlay.append(self.end_date_picker)
+        self._page_ref.update()
         self._build_controls()
 
+    # ---- Calendar picker handlers ----
+    def _open_start_picker(self, e):
+        self.start_date_picker.open = True
+        self._page_ref.update()
+
+    def _on_start_picked(self, e):
+        if e.control.value:
+            dt = e.control.value
+            self._start_iso = dt.strftime("%Y-%m-%d")
+            self.start_date_display.value = dt.strftime("%d/%m/%Y")
+            self.start_date_display.update()
+
+    def _open_end_picker(self, e):
+        self.end_date_picker.open = True
+        self._page_ref.update()
+
+    def _on_end_picked(self, e):
+        if e.control.value:
+            dt = e.control.value
+            self._end_iso = dt.strftime("%Y-%m-%d")
+            self.end_date_display.value = dt.strftime("%d/%m/%Y")
+            self.end_date_display.update()
+
     def _build_controls(self):
+        start_row = ft.Row([self.start_date_display, self.start_date_btn], spacing=4)
+        end_row = ft.Row([self.end_date_display, self.end_date_btn], spacing=4)
+
         filter_card = ft.Container(
             content=ft.Column([
                 ft.Text("Report Filters", size=18, weight=ft.FontWeight.BOLD),
-                ft.Row([self.start_date, self.end_date], spacing=12),
+                ft.Row([start_row, end_row], spacing=12),
                 ft.Row([self.sales_btn, self.expiry_btn, self.status_text], spacing=12),
             ], spacing=12),
             padding=20,
@@ -88,19 +145,11 @@ class ReportsView(ft.Column):
         ]
         self.update()
 
-    def _parse_date(self, value):
-        """Parse DD/MM/YYYY to YYYY-MM-DD string."""
-        try:
-            dt = datetime.strptime(value.strip(), "%d/%m/%Y")
-            return dt.strftime("%Y-%m-%d")
-        except ValueError:
-            return None
-
     def _gen_sales_report(self, e):
-        sd = self._parse_date(self.start_date.value)
-        ed = self._parse_date(self.end_date.value)
+        sd = self._start_iso
+        ed = self._end_iso
         if not sd or not ed:
-            self.status_text.value = "❌ Invalid date format. Use DD/MM/YYYY."
+            self.status_text.value = "❌ Please select both dates."
             self.status_text.color = ft.Colors.RED_700
             self.status_text.update()
             return
@@ -149,10 +198,10 @@ class ReportsView(ft.Column):
         self.status_text.update()
 
     def _gen_expiry_audit(self, e):
-        sd = self._parse_date(self.start_date.value)
-        ed = self._parse_date(self.end_date.value)
+        sd = self._start_iso
+        ed = self._end_iso
         if not sd or not ed:
-            self.status_text.value = "❌ Invalid date format. Use DD/MM/YYYY."
+            self.status_text.value = "❌ Please select both dates."
             self.status_text.color = ft.Colors.RED_700
             self.status_text.update()
             return

@@ -36,6 +36,7 @@ jobs:
             --hidden-import views.pos `
             --hidden-import views.reports `
             --hidden-import views.suppliers `
+            --hidden-import views.settings `
             --icon NONE `
             --clean `
             main.py
