@@ -341,7 +341,7 @@ class POSView(ft.Column):
         self._refresh_cart_ui()
 
     def _show_bill(self, sale_id):
-        """Render a bill preview with print button."""
+        """Render an invoice-style bill preview with print button."""
         sale = get_sale_with_items(sale_id)
         if not sale:
             return
@@ -349,27 +349,41 @@ class POSView(ft.Column):
         settings = get_shop_settings()
         shop_name = settings.get("shop_name", "Medical Store")
 
+        # Build text preview
         lines = []
-        lines.append("=" * 44)
+        lines.append("=" * 72)
         lines.append(f"  {shop_name.upper()}")
-        lines.append("=" * 44)
-        lines.append(f"Bill No  : {sale['bill_no']}")
-        lines.append(f"Date     : {sale['timestamp']}")
-        lines.append(f"Payment  : {sale['payment_type']}")
-        lines.append("-" * 44)
-        lines.append(f"{'Item':<20} {'Qty':>4} {'Price':>8} {'Total':>8}")
-        lines.append("-" * 44)
-        for item in sale["items"]:
+        lines.append("  INVOICE")
+        lines.append("=" * 72)
+        lines.append(f"  Invoice No : {sale['bill_no']}        Date    : {sale['timestamp']}")
+        lines.append(f"  Bill Type  : {sale['payment_type']}")
+        lines.append("-" * 72)
+        lines.append(f"{'S.N.':<5} {'Product Name':<20} {'Batch No.':<12} {'Exp.Date':<10} {'Qty':>5} {'Rate':>10} {'Amount':>10} {'MRP':>8}")
+        lines.append("-" * 72)
+        for i, item in enumerate(sale["items"], 1):
             name = item["product_name"][:18]
-            total = item["qty"] * item["unit_price"]
-            lines.append(f"{name:<20} {item['qty']:>4} {item['unit_price']:>8.2f} {total:>8.2f}")
-        lines.append("-" * 44)
-        lines.append(f"{'Subtotal':>34} {sale['subtotal']:>8.2f}")
-        lines.append(f"{'Discount':>34} {sale['discount']:>8.2f}")
-        lines.append(f"{'GRAND TOTAL':>34} {sale['grand_total']:>8.2f}")
-        lines.append("=" * 44)
-        lines.append("        Thank you for shopping!")
-        lines.append("=" * 44)
+            batch = item.get("batch_no", "")[:10]
+            exp = item.get("exp_date", "")
+            if exp and len(exp) >= 7:
+                # format YYYY-MM-DD → MM/YYYY
+                try:
+                    parts = exp.split("-")
+                    exp = f"{parts[1]}/{parts[0]}"
+                except (IndexError, ValueError):
+                    pass
+            qty = item["qty"]
+            rate = item["unit_price"]
+            amount = qty * rate
+            mrp = item.get("mrp", 0)
+            lines.append(f"{i:<5} {name:<20} {batch:<12} {exp:<10} {qty:>5} {rate:>10.2f} {amount:>10.2f} {mrp:>8.2f}")
+        lines.append("-" * 72)
+        lines.append(f"{'Sub Total':>58} {sale['subtotal']:>12.2f}")
+        lines.append(f"{'Discount Amount':>58} {sale['discount']:>12.2f}")
+        round_off = round(sale['grand_total']) - sale['grand_total']
+        net_amount = sale['grand_total'] + round_off
+        lines.append(f"{'Round Off':>58} {round_off:>12.2f}")
+        lines.append(f"{'Net Amount (NPR)':>58} {net_amount:>12.2f}")
+        lines.append("=" * 72)
 
         bill_text = "\n".join(lines)
 
@@ -386,11 +400,11 @@ class POSView(ft.Column):
 
         self.bill_preview.content = ft.Column([
             ft.Row([
-                ft.Text("Receipt Preview", size=18, weight=ft.FontWeight.BOLD),
+                ft.Text("Invoice Preview", size=18, weight=ft.FontWeight.BOLD),
                 print_btn,
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Container(
-                content=ft.Text(bill_text, font_family="Courier New, monospace", size=12),
+                content=ft.Text(bill_text, font_family="Courier New, monospace", size=11),
                 padding=16,
                 border_radius=8,
                 bgcolor=ft.Colors.GREY_100,
@@ -401,7 +415,7 @@ class POSView(ft.Column):
         self.bill_preview.update()
 
     def _print_bill(self, sale_id):
-        """Generate an HTML receipt and open it in the browser for printing."""
+        """Generate a printable HTML invoice matching the reference bill format."""
         sale = get_sale_with_items(sale_id)
         if not sale:
             return
@@ -410,84 +424,179 @@ class POSView(ft.Column):
         shop_name = settings.get("shop_name", "Medical Store")
         logo_path = settings.get("logo_path", "")
 
-        # Build logo HTML
+        # Build logo as base64 data URI
         logo_html = ""
         if logo_path and os.path.exists(logo_path):
             try:
                 with open(logo_path, "rb") as f:
                     logo_data = base64.b64encode(f.read()).decode()
-                ext = os.path.splitext(logo_path)[1].lower()
-                mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "svg": "image/svg+xml"}.get(ext.lstrip("."), "image/png")
-                logo_html = f'<img src="data:{mime};base64,{logo_data}" style="max-height:60px;margin-bottom:8px;" /><br/>'
+                ext = os.path.splitext(logo_path)[1].lower().lstrip(".")
+                mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "svg": "image/svg+xml"}.get(ext, "image/png")
+                logo_html = f'<img src="data:{mime};base64,{logo_data}" style="max-height:70px;" />'
             except Exception:
                 pass
 
-        # Build items HTML
+        # Format invoice date
+        inv_date = sale['timestamp']
+
+        # Build items rows
         items_html = ""
-        for item in sale["items"]:
-            total = item["qty"] * item["unit_price"]
+        for i, item in enumerate(sale["items"], 1):
+            exp = item.get("exp_date", "")
+            if exp and "-" in exp:
+                try:
+                    parts = exp.split("-")
+                    exp = f"{parts[1]}/{parts[0]}"
+                except (IndexError, ValueError):
+                    pass
+            amount = item["qty"] * item["unit_price"]
+            mrp = item.get("mrp", 0)
+            packing = item.get("category", "")
             items_html += f"""
             <tr>
-                <td style="text-align:left;padding:4px 8px;">{item['product_name']}</td>
-                <td style="text-align:center;padding:4px 8px;">{item['qty']}</td>
-                <td style="text-align:right;padding:4px 8px;">Rs. {item['unit_price']:.2f}</td>
-                <td style="text-align:right;padding:4px 8px;">Rs. {total:.2f}</td>
+                <td class="c">{i}</td>
+                <td class="l">{item['product_name']}</td>
+                <td class="c">{packing}</td>
+                <td class="c">{item.get('batch_no', '')}</td>
+                <td class="c">{exp}</td>
+                <td class="c">{item['qty']}</td>
+                <td class="r">{item['unit_price']:.2f}</td>
+                <td class="r">{amount:.2f}</td>
+                <td class="r">{mrp:.2f}</td>
             </tr>"""
+
+        # Round off calculation
+        round_off = round(sale['grand_total']) - sale['grand_total']
+        net_amount = sale['grand_total'] + round_off
 
         html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8"/>
-    <title>Receipt - {sale['bill_no']}</title>
+    <title>Invoice - {sale['bill_no']}</title>
     <style>
-        body {{ font-family: 'Courier New', monospace; max-width: 380px; margin: 0 auto; padding: 20px; font-size: 13px; }}
-        .header {{ text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }}
-        .header h2 {{ margin: 4px 0; font-size: 18px; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        th {{ border-bottom: 1px solid #000; padding: 4px 8px; font-size: 12px; }}
-        .totals td {{ padding: 2px 8px; }}
-        .totals .grand {{ font-weight: bold; font-size: 15px; border-top: 2px solid #000; }}
-        .footer {{ text-align: center; margin-top: 16px; border-top: 2px solid #000; padding-top: 10px; }}
-        @media print {{ body {{ margin: 0; padding: 5px; }} }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 15px; color: #000; }}
+        .invoice-box {{ max-width: 900px; margin: 0 auto; border: 2px solid #000; }}
+
+        /* --- Header --- */
+        .header {{ display: flex; align-items: center; padding: 12px 16px; border-bottom: 2px solid #000; }}
+        .header .logo {{ flex: 0 0 80px; margin-right: 16px; }}
+        .header .logo img {{ max-height: 70px; max-width: 75px; }}
+        .header .shop-info {{ flex: 1; text-align: center; }}
+        .header .shop-info h1 {{ font-size: 22px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px; }}
+        .header .shop-info p {{ font-size: 11px; color: #333; line-height: 1.5; }}
+
+        /* --- Meta section --- */
+        .meta {{ display: flex; border-bottom: 2px solid #000; }}
+        .meta-left, .meta-right {{ flex: 1; padding: 8px 16px; }}
+        .meta-right {{ border-left: 1px solid #000; }}
+        .meta table {{ width: 100%; }}
+        .meta td {{ padding: 2px 0; font-size: 12px; vertical-align: top; }}
+        .meta td.label {{ font-weight: bold; width: 130px; }}
+        .meta td.sep {{ width: 10px; text-align: center; }}
+        .meta td.val {{ }}
+
+        /* --- Items table --- */
+        .items {{ width: 100%; border-collapse: collapse; }}
+        .items th {{ background: #f0f0f0; border: 1px solid #000; padding: 5px 4px; font-size: 11px; font-weight: bold; text-align: center; }}
+        .items td {{ border: 1px solid #777; padding: 4px; font-size: 11px; }}
+        .items td.l {{ text-align: left; }}
+        .items td.r {{ text-align: right; }}
+        .items td.c {{ text-align: center; }}
+        .items tbody tr:nth-child(even) {{ background: #fafafa; }}
+
+        /* --- Totals --- */
+        .totals-row {{ display: flex; border-top: 2px solid #000; }}
+        .totals-left {{ flex: 1; padding: 8px 16px; font-size: 11px; border-right: 1px solid #000; }}
+        .totals-right {{ flex: 0 0 280px; padding: 0; }}
+        .totals-right table {{ width: 100%; border-collapse: collapse; }}
+        .totals-right td {{ padding: 4px 10px; font-size: 12px; border-bottom: 1px solid #ddd; }}
+        .totals-right td.lbl {{ text-align: right; font-weight: bold; }}
+        .totals-right td.val {{ text-align: right; min-width: 100px; }}
+        .totals-right tr.net td {{ font-size: 14px; font-weight: bold; border-top: 2px solid #000; border-bottom: none; background: #f0f0f0; }}
+
+        .footer {{ text-align: center; padding: 8px; font-size: 11px; border-top: 1px solid #000; color: #555; }}
+
+        @media print {{
+            body {{ padding: 0; }}
+            .invoice-box {{ border: none; }}
+            .no-print {{ display: none; }}
+        }}
     </style>
 </head>
 <body onload="window.print()">
+<div class="invoice-box">
+
+    <!-- HEADER: Logo + Shop Name -->
     <div class="header">
-        {logo_html}
-        <h2>{shop_name}</h2>
+        <div class="logo">{logo_html}</div>
+        <div class="shop-info">
+            <h1>{shop_name.upper()}</h1>
+        </div>
     </div>
-    <div style="margin-bottom:10px;">
-        <strong>Bill No:</strong> {sale['bill_no']}<br/>
-        <strong>Date:</strong> {sale['timestamp']}<br/>
-        <strong>Payment:</strong> {sale['payment_type']}
+
+    <!-- META: Customer info (left) + Invoice info (right) -->
+    <div class="meta">
+        <div class="meta-left">
+            <div style="text-align:center; font-size:14px; font-weight:bold; border-bottom:1px solid #000; padding-bottom:4px; margin-bottom:6px;">INVOICE</div>
+        </div>
+        <div class="meta-right">
+            <table>
+                <tr><td class="label">Invoice No.</td><td class="sep">:</td><td class="val">{sale['bill_no']}</td></tr>
+                <tr><td class="label">Invoice Date</td><td class="sep">:</td><td class="val">{inv_date}</td></tr>
+                <tr><td class="label">Bill Type</td><td class="sep">:</td><td class="val">{sale['payment_type']}</td></tr>
+            </table>
+        </div>
     </div>
-    <table>
+
+    <!-- ITEMS TABLE -->
+    <table class="items">
         <thead>
             <tr>
-                <th style="text-align:left;">Item</th>
-                <th style="text-align:center;">Qty</th>
-                <th style="text-align:right;">Price</th>
-                <th style="text-align:right;">Total</th>
+                <th style="width:35px;">S.N.</th>
+                <th style="min-width:150px;">Product Name</th>
+                <th style="width:70px;">Packing</th>
+                <th style="width:90px;">Batch No.</th>
+                <th style="width:70px;">Exp. Date</th>
+                <th style="width:40px;">Qty</th>
+                <th style="width:80px;">Rate (NPR)</th>
+                <th style="width:90px;">Amount (NPR)</th>
+                <th style="width:70px;">MRP</th>
             </tr>
         </thead>
         <tbody>
             {items_html}
         </tbody>
     </table>
-    <table class="totals" style="margin-top:10px;">
-        <tr><td style="text-align:right;" colspan="3">Subtotal</td><td style="text-align:right;">Rs. {sale['subtotal']:.2f}</td></tr>
-        <tr><td style="text-align:right;" colspan="3">Discount</td><td style="text-align:right;">Rs. {sale['discount']:.2f}</td></tr>
-        <tr class="grand"><td style="text-align:right;" colspan="3">GRAND TOTAL</td><td style="text-align:right;">Rs. {sale['grand_total']:.2f}</td></tr>
-    </table>
-    <div class="footer">
-        Thank you for shopping!
+
+    <!-- TOTALS -->
+    <div class="totals-row">
+        <div class="totals-left">
+            &nbsp;
+        </div>
+        <div class="totals-right">
+            <table>
+                <tr><td class="lbl">Sub Total</td><td class="val">{sale['subtotal']:,.2f}</td></tr>
+                <tr><td class="lbl">Discount Amount</td><td class="val">{sale['discount']:,.2f}</td></tr>
+                <tr><td class="lbl">Round Off</td><td class="val">{round_off:,.2f}</td></tr>
+                <tr class="net"><td class="lbl">Net Amount (NPR) :</td><td class="val">{net_amount:,.2f}</td></tr>
+            </table>
+        </div>
     </div>
+
+    <div class="footer">
+        Thank you for your business!
+    </div>
+
+</div>
 </body>
 </html>"""
 
-        # Write to temp file and open in browser
-        tmp_file = os.path.join(tempfile.gettempdir(), f"receipt_{sale['bill_no']}.html")
+        # Write to temp file and open in browser for printing
+        tmp_file = os.path.join(tempfile.gettempdir(), f"invoice_{sale['bill_no']}.html")
         with open(tmp_file, "w", encoding="utf-8") as f:
             f.write(html)
 
         webbrowser.open(f"file://{tmp_file}")
+

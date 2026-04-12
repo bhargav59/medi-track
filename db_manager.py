@@ -309,7 +309,7 @@ def get_sale_with_items(sale_id):
         return None
     sale_dict = dict(sale)
     items = conn.execute(
-        """SELECT si.*, s.batch_no, p.name AS product_name
+        """SELECT si.*, s.batch_no, s.exp_date, s.mrp, p.name AS product_name, p.category
            FROM SaleItems si
            JOIN Stock s ON si.stock_id = s.id
            JOIN Products p ON s.product_id = p.id
