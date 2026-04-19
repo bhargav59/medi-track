@@ -8,6 +8,12 @@ Launches the Flet desktop application with:
 
 Run:  python main.py
 """
+import sys
+try:
+    import flet_desktop
+    import flet_desktop.version
+except ImportError:
+    pass
 
 import flet as ft
 from db_manager import initialize_database
