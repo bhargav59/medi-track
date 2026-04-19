@@ -8,7 +8,10 @@ and all CRUD operations for:
 The database file (medi_store.db) is auto-created on first run.
 """
 
+import sqlite3
+import os
 import sys
+from datetime import datetime, timedelta
 
 # Determine the application root directory (works in dev and as a compiled .exe)
 if getattr(sys, 'frozen', False):
