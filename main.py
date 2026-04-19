@@ -9,6 +9,14 @@ Launches the Flet desktop application with:
 Run:  python main.py
 """
 import sys
+import os
+
+try:
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+except ImportError:
+    pass
+
 try:
     import flet_desktop
     import flet_desktop.version

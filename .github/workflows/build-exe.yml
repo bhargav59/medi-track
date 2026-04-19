@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flet flet-desktop pyinstaller nepali-datetime
+          pip install flet flet-desktop pyinstaller nepali-datetime certifi
 
       - name: Build EXE with Flet Pack
         run: python build.py

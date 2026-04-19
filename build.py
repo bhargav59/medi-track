@@ -36,6 +36,7 @@ def build():
         "--hidden-import", "nepali_datetime",
         "--hidden-import", "nepali_date",
         "--hidden-import", "flet_desktop",
+        "--hidden-import", "certifi",
         "-y"
     ]
 
