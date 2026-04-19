@@ -367,34 +367,31 @@ class POSView(ft.Column):
                 self._cust_phone,
             ], spacing=10, tight=True, width=400),
             actions=[
-                ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dlg)),
+                ft.TextButton("Cancel", on_click=lambda _: self._close_dialog()),
                 ft.ElevatedButton(
                     "Complete Sale",
                     icon=ft.Icons.CHECK_CIRCLE,
-                    on_click=lambda _: self._finalize_sale(dlg),
+                    on_click=lambda _: self._finalize_sale(),
                     style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE),
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self._page_ref.overlay.append(dlg)
-        dlg.open = True
-        self._page_ref.update()
+        # Flet 0.82+: use show_dialog / pop_dialog instead of overlay
+        self._page_ref.show_dialog(dlg)
 
-    def _close_dialog(self, dlg):
-        dlg.open = False
-        self._page_ref.update()
+    def _close_dialog(self):
+        self._page_ref.pop_dialog()
 
-    def _finalize_sale(self, dlg):
+    def _finalize_sale(self):
         """Actually finalize the sale after customer dialog."""
         cust_name = self._cust_name.value.strip() if self._cust_name.value else ""
         cust_address = self._cust_address.value.strip() if self._cust_address.value else ""
         cust_pan = self._cust_pan.value.strip() if self._cust_pan.value else ""
         cust_phone = self._cust_phone.value.strip() if self._cust_phone.value else ""
 
-        # Close dialog
-        dlg.open = False
-        self._page_ref.update()
+        # Close dialog first
+        self._page_ref.pop_dialog()
 
         subtotal = sum(item["qty"] * item["unit_price"] for item in self.cart)
         try:

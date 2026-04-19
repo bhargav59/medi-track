@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flet pyinstaller
+          pip install flet pyinstaller nepali-datetime
 
       - name: Build EXE with PyInstaller
         run: |
@@ -33,6 +33,7 @@ jobs:
             --hidden-import flet `
             --hidden-import flet_desktop `
             --hidden-import nepali_date `
+            --hidden-import nepali_datetime `
             --hidden-import views.dashboard `
             --hidden-import views.inventory `
             --hidden-import views.pos `

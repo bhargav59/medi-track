@@ -31,7 +31,7 @@ if not exist ".venv" (
 
 REM Activate and install
 call .venv\Scripts\activate.bat
-pip install flet pyinstaller
+pip install flet pyinstaller nepali-datetime
 
 REM Build the exe
 echo.
@@ -44,6 +44,7 @@ pyinstaller --name "MediTrackNepal" ^
     --hidden-import flet ^
     --hidden-import flet_desktop ^
     --hidden-import nepali_date ^
+    --hidden-import nepali_datetime ^
     --hidden-import views.dashboard ^
     --hidden-import views.inventory ^
     --hidden-import views.pos ^
