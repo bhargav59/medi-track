@@ -10,13 +10,17 @@ Compatible with flet 0.82+ (async FilePicker, page.services).
 """
 
 import flet as ft
-import os
-import shutil
-from db_manager import get_shop_settings, save_shop_settings
+import sys
 
+# Determine the application root directory (works in dev and as a compiled .exe)
+if getattr(sys, 'frozen', False):
+    # If compiled with PyInstaller, the executable directory
+    APP_ROOT = os.path.dirname(sys.executable)
+else:
+    # If running from source, the project root (where main.py lives)
+    APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Directory to store uploaded assets (alongside the database)
-ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shop_assets")
+ASSETS_DIR = os.path.join(APP_ROOT, "shop_assets")
 
 
 class SettingsView(ft.Column):

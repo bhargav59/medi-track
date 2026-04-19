@@ -8,14 +8,17 @@ and all CRUD operations for:
 The database file (medi_store.db) is auto-created on first run.
 """
 
-import sqlite3
-import os
-from datetime import datetime, timedelta
+import sys
 
-# ---------------------------------------------------------------------------
-# Database path — sits alongside the script
-# ---------------------------------------------------------------------------
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "medi_store.db")
+# Determine the application root directory (works in dev and as a compiled .exe)
+if getattr(sys, 'frozen', False):
+    # If compiled with PyInstaller, the executable directory
+    APP_ROOT = os.path.dirname(sys.executable)
+else:
+    # If running from source, the project directory
+    APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH = os.path.join(APP_ROOT, "medi_store.db")
 
 
 def get_connection():
