@@ -415,13 +415,18 @@ class POSView(ft.Column):
         self.bill_preview.update()
 
     def _print_bill(self, sale_id):
-        """Generate a printable HTML invoice matching the reference bill format."""
+        """Generate a printable HTML invoice exactly matching the reference bill format."""
         sale = get_sale_with_items(sale_id)
         if not sale:
             return
 
         settings = get_shop_settings()
         shop_name = settings.get("shop_name", "Medical Store")
+        shop_address = settings.get("shop_address", "")
+        shop_phone = settings.get("shop_phone", "")
+        shop_email = settings.get("shop_email", "")
+        shop_pan = settings.get("shop_pan", "")
+        bank_details = settings.get("bank_details", "")
         logo_path = settings.get("logo_path", "")
 
         # Build logo as base64 data URI
@@ -431,16 +436,30 @@ class POSView(ft.Column):
                 with open(logo_path, "rb") as f:
                     logo_data = base64.b64encode(f.read()).decode()
                 ext = os.path.splitext(logo_path)[1].lower().lstrip(".")
-                mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "svg": "image/svg+xml"}.get(ext, "image/png")
-                logo_html = f'<img src="data:{mime};base64,{logo_data}" style="max-height:70px;" />'
+                mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif"}.get(ext, "image/png")
+                logo_html = f'<img src="data:{mime};base64,{logo_data}" />'
             except Exception:
                 pass
 
-        # Format invoice date
         inv_date = sale['timestamp']
+
+        # Build shop contact line
+        contact_parts = []
+        if shop_address:
+            contact_parts.append(shop_address)
+        contact_line = ""
+        email_phone_line = ""
+        if shop_email:
+            email_phone_line += f"Email : {shop_email}"
+        if shop_phone:
+            if email_phone_line:
+                email_phone_line += f"&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;"
+            email_phone_line += f"Phone No. : {shop_phone}"
+        pan_line = f"PAN : {shop_pan}" if shop_pan else ""
 
         # Build items rows
         items_html = ""
+        num_items = len(sale["items"])
         for i, item in enumerate(sale["items"], 1):
             exp = item.get("exp_date", "")
             if exp and "-" in exp:
@@ -460,14 +479,31 @@ class POSView(ft.Column):
                 <td class="c">{item.get('batch_no', '')}</td>
                 <td class="c">{exp}</td>
                 <td class="c">{item['qty']}</td>
-                <td class="r">{item['unit_price']:.2f}</td>
-                <td class="r">{amount:.2f}</td>
-                <td class="r">{mrp:.2f}</td>
+                <td class="c">0.00</td>
+                <td class="r">{item['unit_price']:,.2f}</td>
+                <td class="r">{amount:,.2f}</td>
+                <td class="r">{mrp:,.2f}</td>
             </tr>"""
 
-        # Round off calculation
+        # Add empty rows to fill table like the reference (minimum ~20 rows)
+        for j in range(num_items + 1, 21):
+            items_html += """
+            <tr>
+                <td class="c">&nbsp;</td><td class="l">&nbsp;</td><td class="c"></td>
+                <td class="c"></td><td class="c"></td><td class="c"></td>
+                <td class="c"></td><td class="r"></td><td class="r"></td><td class="r"></td>
+            </tr>"""
+
+        # Round off & net amount
         round_off = round(sale['grand_total']) - sale['grand_total']
-        net_amount = sale['grand_total'] + round_off
+        net_amount = round(sale['grand_total'])
+
+        # Amount in words
+        net_int = int(net_amount)
+        amount_words = self._amount_to_words(net_int)
+
+        # Bank details (multiline → <br>)
+        bank_html = bank_details.replace("\n", "<br/>") if bank_details else ""
 
         html = f"""<!DOCTYPE html>
 <html>
@@ -476,93 +512,122 @@ class POSView(ft.Column):
     <title>Invoice - {sale['bill_no']}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 15px; color: #000; }}
-        .invoice-box {{ max-width: 900px; margin: 0 auto; border: 2px solid #000; }}
+        body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 10px; color: #000; }}
+        .inv {{ max-width: 960px; margin: 0 auto; border: 2px solid #000; }}
 
-        /* --- Header --- */
-        .header {{ display: flex; align-items: center; padding: 12px 16px; border-bottom: 2px solid #000; }}
-        .header .logo {{ flex: 0 0 80px; margin-right: 16px; }}
-        .header .logo img {{ max-height: 70px; max-width: 75px; }}
-        .header .shop-info {{ flex: 1; text-align: center; }}
-        .header .shop-info h1 {{ font-size: 22px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px; }}
-        .header .shop-info p {{ font-size: 11px; color: #333; line-height: 1.5; }}
+        /* HEADER */
+        .hdr {{ display: flex; align-items: center; padding: 10px 14px; border-bottom: 2px solid #000; }}
+        .hdr .logo {{ flex: 0 0 90px; text-align: center; }}
+        .hdr .logo img {{ max-height: 75px; max-width: 80px; }}
+        .hdr .info {{ flex: 1; text-align: center; }}
+        .hdr .info h1 {{ font-size: 22px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }}
+        .hdr .info .loc {{ font-size: 12px; font-weight: bold; margin-bottom: 2px; }}
+        .hdr .info .contact {{ font-size: 10px; color: #333; }}
 
-        /* --- Meta section --- */
-        .meta {{ display: flex; border-bottom: 2px solid #000; }}
-        .meta-left, .meta-right {{ flex: 1; padding: 8px 16px; }}
-        .meta-right {{ border-left: 1px solid #000; }}
-        .meta table {{ width: 100%; }}
-        .meta td {{ padding: 2px 0; font-size: 12px; vertical-align: top; }}
-        .meta td.label {{ font-weight: bold; width: 130px; }}
-        .meta td.sep {{ width: 10px; text-align: center; }}
-        .meta td.val {{ }}
+        /* META SECTION */
+        .meta {{ display: flex; border-bottom: 2px solid #000; font-size: 12px; }}
+        .meta-left {{ flex: 1; padding: 6px 12px; }}
+        .meta-center {{ flex: 0 0 120px; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; border-left: 1px solid #000; border-right: 1px solid #000; }}
+        .meta-center span {{ font-size: 16px; font-weight: bold; text-decoration: underline; }}
+        .meta-right {{ flex: 1; padding: 6px 12px; }}
+        .meta td {{ padding: 1px 0; }}
+        .meta td.lbl {{ font-weight: bold; width: 120px; }}
+        .meta td.sep {{ width: 12px; text-align: center; }}
 
-        /* --- Items table --- */
+        /* TRANSPORT / CN ROW */
+        .transport-row {{ display: flex; border-bottom: 2px solid #000; font-size: 11px; padding: 3px 12px; }}
+        .transport-row span {{ margin-right: 30px; }}
+
+        /* ITEMS TABLE */
         .items {{ width: 100%; border-collapse: collapse; }}
-        .items th {{ background: #f0f0f0; border: 1px solid #000; padding: 5px 4px; font-size: 11px; font-weight: bold; text-align: center; }}
-        .items td {{ border: 1px solid #777; padding: 4px; font-size: 11px; }}
+        .items th {{ background: #e8e8e8; border: 1px solid #000; padding: 4px 3px; font-size: 10.5px; font-weight: bold; text-align: center; }}
+        .items td {{ border: 1px solid #999; padding: 3px 4px; font-size: 10.5px; }}
         .items td.l {{ text-align: left; }}
         .items td.r {{ text-align: right; }}
         .items td.c {{ text-align: center; }}
-        .items tbody tr:nth-child(even) {{ background: #fafafa; }}
 
-        /* --- Totals --- */
-        .totals-row {{ display: flex; border-top: 2px solid #000; }}
-        .totals-left {{ flex: 1; padding: 8px 16px; font-size: 11px; border-right: 1px solid #000; }}
-        .totals-right {{ flex: 0 0 280px; padding: 0; }}
-        .totals-right table {{ width: 100%; border-collapse: collapse; }}
-        .totals-right td {{ padding: 4px 10px; font-size: 12px; border-bottom: 1px solid #ddd; }}
-        .totals-right td.lbl {{ text-align: right; font-weight: bold; }}
-        .totals-right td.val {{ text-align: right; min-width: 100px; }}
-        .totals-right tr.net td {{ font-size: 14px; font-weight: bold; border-top: 2px solid #000; border-bottom: none; background: #f0f0f0; }}
+        /* TOTALS FOOTER */
+        .footer-row {{ display: flex; border-top: 2px solid #000; }}
+        .footer-left {{ flex: 1; padding: 6px 12px; font-size: 11px; border-right: 1px solid #000; }}
+        .footer-left .bank-title {{ font-weight: bold; margin-bottom: 2px; }}
+        .footer-right {{ flex: 0 0 290px; }}
+        .footer-right table {{ width: 100%; border-collapse: collapse; }}
+        .footer-right td {{ padding: 3px 8px; font-size: 12px; border-bottom: 1px solid #ccc; }}
+        .footer-right td.lbl {{ text-align: right; font-weight: bold; }}
+        .footer-right td.val {{ text-align: right; width: 110px; }}
+        .footer-right tr.net td {{ font-size: 13px; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; background: #f0f0f0; }}
 
-        .footer {{ text-align: center; padding: 8px; font-size: 11px; border-top: 1px solid #000; color: #555; }}
+        .words-row {{ padding: 4px 12px; font-size: 11px; border-top: 1px solid #000; font-style: italic; }}
+        .notice {{ padding: 4px 12px; font-size: 10px; text-align: right; color: #555; border-top: 1px solid #ddd; }}
 
         @media print {{
-            body {{ padding: 0; }}
-            .invoice-box {{ border: none; }}
-            .no-print {{ display: none; }}
+            body {{ padding: 0; margin: 0; }}
+            .inv {{ border: none; }}
+            .no-print {{ display: none !important; }}
+            @page {{ margin: 5mm; }}
         }}
     </style>
 </head>
 <body onload="window.print()">
-<div class="invoice-box">
+<div class="inv">
 
-    <!-- HEADER: Logo + Shop Name -->
-    <div class="header">
+    <!-- HEADER -->
+    <div class="hdr">
         <div class="logo">{logo_html}</div>
-        <div class="shop-info">
+        <div class="info">
             <h1>{shop_name.upper()}</h1>
+            {"<div class='loc'>" + shop_address + "</div>" if shop_address else ""}
+            <div class="contact">
+                {email_phone_line}
+                {"<br/>" + pan_line if pan_line else ""}
+            </div>
         </div>
     </div>
 
-    <!-- META: Customer info (left) + Invoice info (right) -->
+    <!-- META: Customer (left) | INVOICE label (center) | Invoice details (right) -->
     <div class="meta">
         <div class="meta-left">
-            <div style="text-align:center; font-size:14px; font-weight:bold; border-bottom:1px solid #000; padding-bottom:4px; margin-bottom:6px;">INVOICE</div>
+            <table>
+                <tr><td class="lbl">CUSTOMER NAME</td><td class="sep">:</td><td></td></tr>
+                <tr><td class="lbl">Address</td><td class="sep">:</td><td></td></tr>
+                <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td></td></tr>
+                <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td></td></tr>
+            </table>
+        </div>
+        <div class="meta-center">
+            <span>INVOICE</span>
         </div>
         <div class="meta-right">
             <table>
-                <tr><td class="label">Invoice No.</td><td class="sep">:</td><td class="val">{sale['bill_no']}</td></tr>
-                <tr><td class="label">Invoice Date</td><td class="sep">:</td><td class="val">{inv_date}</td></tr>
-                <tr><td class="label">Bill Type</td><td class="sep">:</td><td class="val">{sale['payment_type']}</td></tr>
+                <tr><td class="lbl">Invoice No.</td><td class="sep">:</td><td>{sale['bill_no']}</td></tr>
+                <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td>{inv_date}</td></tr>
+                <tr><td class="lbl">Bill Type</td><td class="sep">:</td><td>{sale['payment_type']}</td></tr>
+                <tr><td class="lbl">Transaction Date</td><td class="sep">:</td><td>{inv_date[:10]}</td></tr>
             </table>
         </div>
+    </div>
+
+    <!-- TRANSPORT / CN ROW -->
+    <div class="transport-row">
+        <span><b>Transport:</b> __________</span>
+        <span><b>C.N. NO.:</b> __________</span>
+        <span style="margin-left:auto"><b>No. of Cases:</b> {len(sale['items'])}</span>
     </div>
 
     <!-- ITEMS TABLE -->
     <table class="items">
         <thead>
             <tr>
-                <th style="width:35px;">S.N.</th>
-                <th style="min-width:150px;">Product Name</th>
-                <th style="width:70px;">Packing</th>
-                <th style="width:90px;">Batch No.</th>
-                <th style="width:70px;">Exp. Date</th>
-                <th style="width:40px;">Qty</th>
-                <th style="width:80px;">Rate (NPR)</th>
-                <th style="width:90px;">Amount (NPR)</th>
-                <th style="width:70px;">MRP</th>
+                <th style="width:30px">S.N.</th>
+                <th style="min-width:140px">Product Name</th>
+                <th style="width:60px">Packing</th>
+                <th style="width:80px">Batch No.</th>
+                <th style="width:65px">Exp. Date</th>
+                <th style="width:35px">Qty</th>
+                <th style="width:40px">Free</th>
+                <th style="width:75px">Rate (NPR)</th>
+                <th style="width:85px">Amount (NPR)</th>
+                <th style="width:65px">MRP</th>
             </tr>
         </thead>
         <tbody>
@@ -570,23 +635,31 @@ class POSView(ft.Column):
         </tbody>
     </table>
 
-    <!-- TOTALS -->
-    <div class="totals-row">
-        <div class="totals-left">
-            &nbsp;
+    <!-- TOTALS FOOTER -->
+    <div class="footer-row">
+        <div class="footer-left">
+            {"<div class='bank-title'>Bank Details:</div><div>" + bank_html + "</div><br/>" if bank_html else ""}
+            <div style="margin-top:8px"><b>Your Current Balance</b></div>
+            <div style="font-size:16px; font-weight:bold; margin-top:2px;">{net_amount:,.2f}</div>
         </div>
-        <div class="totals-right">
+        <div class="footer-right">
             <table>
                 <tr><td class="lbl">Sub Total</td><td class="val">{sale['subtotal']:,.2f}</td></tr>
-                <tr><td class="lbl">Discount Amount</td><td class="val">{sale['discount']:,.2f}</td></tr>
+                <tr><td class="lbl">Discount Amount :</td><td class="val">{sale['discount']:,.2f}</td></tr>
                 <tr><td class="lbl">Round Off</td><td class="val">{round_off:,.2f}</td></tr>
                 <tr class="net"><td class="lbl">Net Amount (NPR) :</td><td class="val">{net_amount:,.2f}</td></tr>
             </table>
         </div>
     </div>
 
-    <div class="footer">
-        Thank you for your business!
+    <!-- AMOUNT IN WORDS -->
+    <div class="words-row">
+        <b>In Words:</b> Nepalese Rupees {amount_words} Only
+    </div>
+
+    <!-- NOTICE -->
+    <div class="notice">
+        ...and lot bonus is not returnable.
     </div>
 
 </div>
@@ -599,4 +672,42 @@ class POSView(ft.Column):
             f.write(html)
 
         webbrowser.open(f"file://{tmp_file}")
+
+    @staticmethod
+    def _amount_to_words(n):
+        """Convert an integer amount to English words (Nepali invoice style)."""
+        if n == 0:
+            return "Zero"
+        ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+                "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+                "Seventeen", "Eighteen", "Nineteen"]
+        tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+
+        def two_digits(num):
+            if num < 20:
+                return ones[num]
+            return tens[num // 10] + ("-" + ones[num % 10] if num % 10 else "")
+
+        def three_digits(num):
+            if num >= 100:
+                return ones[num // 100] + " Hundred" + (" " + two_digits(num % 100) if num % 100 else "")
+            return two_digits(num)
+
+        parts = []
+        if n >= 10000000:
+            parts.append(two_digits(n // 10000000) + " Crore")
+            n %= 10000000
+        if n >= 100000:
+            parts.append(two_digits(n // 100000) + " Lakh")
+            n %= 100000
+        if n >= 1000:
+            parts.append(two_digits(n // 1000) + " Thousand")
+            n %= 1000
+        if n >= 100:
+            parts.append(three_digits(n))
+        elif n > 0:
+            parts.append(two_digits(n))
+
+        return " ".join(parts)
+
 

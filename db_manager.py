@@ -86,9 +86,14 @@ def initialize_database():
         );
 
         CREATE TABLE IF NOT EXISTS ShopSettings (
-            id          INTEGER PRIMARY KEY CHECK (id = 1),
-            shop_name   TEXT    DEFAULT 'Medical Store',
-            logo_path   TEXT    DEFAULT ''
+            id            INTEGER PRIMARY KEY CHECK (id = 1),
+            shop_name     TEXT    DEFAULT 'Medical Store',
+            shop_address  TEXT    DEFAULT '',
+            shop_phone    TEXT    DEFAULT '',
+            shop_email    TEXT    DEFAULT '',
+            shop_pan      TEXT    DEFAULT '',
+            bank_details  TEXT    DEFAULT '',
+            logo_path     TEXT    DEFAULT ''
         );
     """)
 
@@ -450,33 +455,35 @@ def get_expiry_audit(start_date, end_date):
 # ============================= SHOP SETTINGS ================================
 
 def get_shop_settings():
-    """Return shop settings dict (shop_name, logo_path). Creates default if missing."""
+    """Return shop settings dict. Creates default row if missing."""
     conn = get_connection()
     row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
     if not row:
         conn.execute(
-            "INSERT INTO ShopSettings (id, shop_name, logo_path) VALUES (1, 'Medical Store', '')"
+            "INSERT INTO ShopSettings (id, shop_name) VALUES (1, 'Medical Store')"
         )
         conn.commit()
         row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
+    result = dict(row)
     conn.close()
-    return dict(row)
+    return result
 
 
-def save_shop_settings(shop_name, logo_path):
-    """Update shop name and logo path."""
+def save_shop_settings(shop_name, logo_path, shop_address="", shop_phone="", shop_email="", shop_pan="", bank_details=""):
+    """Update all shop settings."""
     conn = get_connection()
-    # Upsert: insert or replace
     existing = conn.execute("SELECT id FROM ShopSettings WHERE id = 1").fetchone()
     if existing:
         conn.execute(
-            "UPDATE ShopSettings SET shop_name = ?, logo_path = ? WHERE id = 1",
-            (shop_name, logo_path),
+            """UPDATE ShopSettings SET shop_name=?, logo_path=?, shop_address=?,
+               shop_phone=?, shop_email=?, shop_pan=?, bank_details=? WHERE id = 1""",
+            (shop_name, logo_path, shop_address, shop_phone, shop_email, shop_pan, bank_details),
         )
     else:
         conn.execute(
-            "INSERT INTO ShopSettings (id, shop_name, logo_path) VALUES (1, ?, ?)",
-            (shop_name, logo_path),
+            """INSERT INTO ShopSettings (id, shop_name, logo_path, shop_address, shop_phone, shop_email, shop_pan, bank_details)
+               VALUES (1, ?, ?, ?, ?, ?, ?, ?)""",
+            (shop_name, logo_path, shop_address, shop_phone, shop_email, shop_pan, bank_details),
         )
     conn.commit()
     conn.close()
