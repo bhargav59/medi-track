@@ -39,7 +39,7 @@ echo Building executable...
 pyinstaller --name "MediTrackNepal" ^
     --onedir ^
     --windowed ^
-    --collect-all nepali-datetime ^
+    --collect-all nepali_datetime ^
     --hidden-import flet ^
     --hidden-import flet_desktop ^
     --hidden-import nepali_date ^
