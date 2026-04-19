@@ -76,7 +76,8 @@ def initialize_database():
             customer_name   TEXT    DEFAULT '',
             customer_address TEXT   DEFAULT '',
             customer_pan    TEXT    DEFAULT '',
-            customer_phone  TEXT    DEFAULT ''
+            customer_phone  TEXT    DEFAULT '',
+            customer_dda    TEXT    DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS SaleItems (
@@ -98,9 +99,22 @@ def initialize_database():
             shop_email    TEXT    DEFAULT 'mediworldpharma2080@gmail.com',
             shop_pan      TEXT    DEFAULT '619833862',
             bank_details  TEXT    DEFAULT '',
-            logo_path     TEXT    DEFAULT ''
+            logo_path     TEXT    DEFAULT '',
+            shop_dda      TEXT    DEFAULT ''
         );
     """)
+
+    # Migration: Add shop_dda to ShopSettings if it doesn't exist
+    try:
+        conn.execute("ALTER TABLE ShopSettings ADD COLUMN shop_dda TEXT DEFAULT ''")
+    except Exception:
+        pass  # Column already exists
+
+    # Migration: Add customer_dda to Sales if it doesn't exist
+    try:
+        conn.execute("ALTER TABLE Sales ADD COLUMN customer_dda TEXT DEFAULT ''")
+    except Exception:
+        pass  # Column already exists
 
     conn.commit()
     conn.close()
@@ -279,39 +293,40 @@ def generate_bill_no():
     return f"BILL-{today}-{seq:03d}"
 
 
-def create_sale(bill_no, subtotal, discount, grand_total, payment_type, items,
-                customer_name="", customer_address="", customer_pan="", customer_phone=""):
+def create_sale(bill_no, subtotal, discount, total, pay_type, items,
+                customer_name='', customer_address='', customer_pan='', customer_phone='', customer_dda=''):
     """
-    Create a sale record and its line-items.
-    items: list of dicts with keys: stock_id, qty, free_qty, unit_price
-    Also reduces stock quantities (qty + free_qty) automatically.
+    Items: list of dicts with {stock_id, qty, free_qty, unit_price}
     """
     conn = get_connection()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = conn.execute(
-        """INSERT INTO Sales (bill_no, timestamp, subtotal, discount, grand_total, payment_type,
-               customer_name, customer_address, customer_pan, customer_phone)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (bill_no, timestamp, subtotal, discount, grand_total, payment_type,
-         customer_name, customer_address, customer_pan, customer_phone),
-    )
-    sale_id = cur.lastrowid
-
-    for item in items:
-        free_qty = item.get("free_qty", 0)
-        conn.execute(
-            "INSERT INTO SaleItems (sale_id, stock_id, qty, free_qty, unit_price) VALUES (?, ?, ?, ?, ?)",
-            (sale_id, item["stock_id"], item["qty"], free_qty, item["unit_price"]),
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """INSERT INTO Sales (bill_no, timestamp, subtotal, discount, grand_total, payment_type,
+                                 customer_name, customer_address, customer_pan, customer_phone, customer_dda)
+               VALUES (?, datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (bill_no, subtotal, discount, total, pay_type, customer_name, customer_address, customer_pan, customer_phone, customer_dda)
         )
-        # Auto-subtract stock: paid qty + free qty both leave inventory
-        total_out = item["qty"] + free_qty
-        conn.execute(
-            "UPDATE Stock SET qty = qty - ? WHERE id = ?",
-            (total_out, item["stock_id"]),
-        )
+        sale_id = cur.lastrowid
 
-    conn.commit()
-    conn.close()
+        for item in items:
+            free_qty = item.get("free_qty", 0)
+            conn.execute(
+                "INSERT INTO SaleItems (sale_id, stock_id, qty, free_qty, unit_price) VALUES (?, ?, ?, ?, ?)",
+                (sale_id, item["stock_id"], item["qty"], free_qty, item["unit_price"]),
+            )
+            # Auto-subtract stock: paid qty + free qty both leave inventory
+            total_out = item["qty"] + free_qty
+            conn.execute(
+                "UPDATE Stock SET qty = qty - ? WHERE id = ?",
+                (total_out, item["stock_id"]),
+            )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
     return sale_id
 
 
@@ -479,21 +494,14 @@ def get_shop_settings():
     return result
 
 
-def save_shop_settings(shop_name, logo_path, shop_address="", shop_phone="", shop_email="", shop_pan="", bank_details=""):
-    """Update all shop settings."""
+def save_shop_settings(shop_name, shop_address, shop_phone, shop_email, shop_pan, bank_details, logo_path, shop_dda):
+    """Update settings in id=1 row."""
     conn = get_connection()
-    existing = conn.execute("SELECT id FROM ShopSettings WHERE id = 1").fetchone()
-    if existing:
-        conn.execute(
-            """UPDATE ShopSettings SET shop_name=?, logo_path=?, shop_address=?,
-               shop_phone=?, shop_email=?, shop_pan=?, bank_details=? WHERE id = 1""",
-            (shop_name, logo_path, shop_address, shop_phone, shop_email, shop_pan, bank_details),
-        )
-    else:
-        conn.execute(
-            """INSERT INTO ShopSettings (id, shop_name, logo_path, shop_address, shop_phone, shop_email, shop_pan, bank_details)
-               VALUES (1, ?, ?, ?, ?, ?, ?, ?)""",
-            (shop_name, logo_path, shop_address, shop_phone, shop_email, shop_pan, bank_details),
-        )
+    conn.execute(
+        """UPDATE ShopSettings
+           SET shop_name=?, shop_address=?, shop_phone=?, shop_email=?, shop_pan=?, bank_details=?, logo_path=?, shop_dda=?
+           WHERE id = 1""",
+        (shop_name, shop_address, shop_phone, shop_email, shop_pan, bank_details, logo_path, shop_dda)
+    )
     conn.commit()
     conn.close()

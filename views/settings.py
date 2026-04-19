@@ -35,6 +35,7 @@ class SettingsView(ft.Column):
         self.shop_phone_field = ft.TextField(label="Phone No.", hint_text="e.g. +977-9812345678", border_radius=8, expand=True)
         self.shop_email_field = ft.TextField(label="Email", hint_text="e.g. info@pharmacy.com", border_radius=8, expand=True)
         self.shop_pan_field = ft.TextField(label="PAN / VAT No.", hint_text="e.g. 619833862", border_radius=8, expand=True)
+        self.shop_dda_field = ft.TextField(label="DDA Registration No.", hint_text="e.g. 123/45/67", border_radius=8, expand=True)
         self.bank_details_field = ft.TextField(
             label="Bank Details (shown on bill footer)",
             hint_text="e.g. Bank Name, A/C No., Branch",
@@ -79,6 +80,7 @@ class SettingsView(ft.Column):
         self.shop_phone_field.value = settings.get("shop_phone", "")
         self.shop_email_field.value = settings.get("shop_email", "")
         self.shop_pan_field.value = settings.get("shop_pan", "")
+        self.shop_dda_field.value = settings.get("shop_dda", "")
         self.bank_details_field.value = settings.get("bank_details", "")
 
         logo_path = settings.get("logo_path", "")
@@ -129,7 +131,7 @@ class SettingsView(ft.Column):
                 self.shop_name_field,
                 self.shop_address_field,
                 ft.Row([self.shop_phone_field, self.shop_email_field], spacing=12),
-                self.shop_pan_field,
+                ft.Row([self.shop_pan_field, self.shop_dda_field], spacing=12),
             ], spacing=12),
             padding=24, border_radius=12, bgcolor=ft.Colors.WHITE,
             shadow=ft.BoxShadow(spread_radius=0, blur_radius=8, color=ft.Colors.with_opacity(0.08, ft.Colors.BLACK), offset=ft.Offset(0, 2)),
@@ -228,10 +230,12 @@ class SettingsView(ft.Column):
             logo_path=self._current_logo_path,
             shop_address=self.shop_address_field.value.strip(),
             shop_phone=self.shop_phone_field.value.strip(),
-            shop_email=self.shop_email_field.value.strip(),
-            shop_pan=self.shop_pan_field.value.strip(),
-            bank_details=self.bank_details_field.value.strip(),
+            shop_email=self.shop_email_field.value,
+            shop_pan=self.shop_pan_field.value,
+            bank_details=self.bank_details_field.value,
+            shop_dda=self.shop_dda_field.value
         )
         self.status_text.value = "✅ Settings saved successfully!"
         self.status_text.color = ft.Colors.GREEN_700
-        self.status_text.update()
+        self.update()
+        self._page_ref.update()

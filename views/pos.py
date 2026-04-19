@@ -355,6 +355,7 @@ class POSView(ft.Column):
         self._cust_address = ft.TextField(label="Address", border_radius=8)
         self._cust_pan = ft.TextField(label="PAN / VAT No.", border_radius=8)
         self._cust_phone = ft.TextField(label="Phone No.", border_radius=8)
+        self._cust_dda = ft.TextField(label="DDA No.", border_radius=8)
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -365,6 +366,7 @@ class POSView(ft.Column):
                 self._cust_address,
                 self._cust_pan,
                 self._cust_phone,
+                self._cust_dda,
             ], spacing=10, tight=True, width=400),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda _: self._close_dialog()),
@@ -389,6 +391,7 @@ class POSView(ft.Column):
         cust_address = self._cust_address.value.strip() if self._cust_address.value else ""
         cust_pan = self._cust_pan.value.strip() if self._cust_pan.value else ""
         cust_phone = self._cust_phone.value.strip() if self._cust_phone.value else ""
+        cust_dda = self._cust_dda.value.strip() if self._cust_dda.value else ""
 
         # Close dialog first
         self._page_ref.pop_dialog()
@@ -409,7 +412,7 @@ class POSView(ft.Column):
 
         sale_id = create_sale(bill_no, subtotal, discount, grand_total, pay_type, items_for_db,
                               customer_name=cust_name, customer_address=cust_address,
-                              customer_pan=cust_pan, customer_phone=cust_phone)
+                              customer_pan=cust_pan, customer_phone=cust_phone, customer_dda=cust_dda)
         self._last_sale_id = sale_id
 
         # Generate bill preview
@@ -506,6 +509,7 @@ class POSView(ft.Column):
         shop_phone = settings.get("shop_phone", "")
         shop_email = settings.get("shop_email", "")
         shop_pan = settings.get("shop_pan", "")
+        shop_dda = settings.get("shop_dda", "")
         bank_details = settings.get("bank_details", "")
         logo_path = settings.get("logo_path", "")
 
@@ -538,6 +542,7 @@ class POSView(ft.Column):
         cust_address = sale.get('customer_address', '')
         cust_pan = sale.get('customer_pan', '')
         cust_phone = sale.get('customer_phone', '')
+        cust_dda = sale.get('customer_dda', '')
 
         # Build shop contact line
         email_phone_line = ""
@@ -548,6 +553,7 @@ class POSView(ft.Column):
                 email_phone_line += f"&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;"
             email_phone_line += f"Phone No. : {shop_phone}"
         pan_line = f"PAN : {shop_pan}" if shop_pan else ""
+        dda_line = f"D.D.A. REG. NO. : {shop_dda}" if shop_dda else ""
 
         # Build items rows
         items_html = ""
@@ -690,6 +696,7 @@ class POSView(ft.Column):
                 <tr><td class="lbl">Address</td><td class="sep">:</td><td>{{CUST_ADDRESS}}</td></tr>
                 <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td>{{CUST_PAN}}</td></tr>
                 <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td>{{CUST_PHONE}}</td></tr>
+                <tr><td class="lbl">DDA No.</td><td class="sep">:</td><td>{{CUST_DDA}}</td></tr>
             </table>
         </div>
         <div class="meta-right">
@@ -764,11 +771,19 @@ class POSView(ft.Column):
         html = html.replace("{{SHOP_NAME}}", shop_name.upper())
         html = html.replace("{{LOC_HTML}}", f"<div class='loc'>{shop_address.upper()}</div>" if shop_address else "")
         html = html.replace("{{CONTACT_HTML}}", email_phone_line)
-        html = html.replace("{{PAN_LINE}}", f"<br/>{pan_line}" if pan_line else "")
+        # Combine PAN and DDA for header
+        header_contact_html = email_phone_line
+        if pan_line:
+            header_contact_html += f"<br/>{pan_line}"
+        if dda_line:
+            header_contact_html += f"<br/>{dda_line}"
+        html = html.replace("{{CONTACT_HTML}}", header_contact_html)
+        html = html.replace("{{PAN_LINE}}", "") # We already added it to CONTACT_HTML replacement if it was separate, but wait...
         html = html.replace("{{CUST_NAME}}", cust_name)
         html = html.replace("{{CUST_ADDRESS}}", cust_address)
         html = html.replace("{{CUST_PAN}}", cust_pan)
         html = html.replace("{{CUST_PHONE}}", cust_phone)
+        html = html.replace("{{CUST_DDA}}", cust_dda)
         html = html.replace("{{BS_DATE}}", bs_date)
         html = html.replace("{{AD_FORMATTED}}", ad_formatted)
         html = html.replace("{{PAY_TYPE}}", sale['payment_type'])
