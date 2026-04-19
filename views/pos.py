@@ -597,74 +597,72 @@ class POSView(ft.Column):
         # Bank details (multiline → <br>)
         bank_html = bank_details.replace("\n", "<br/>") if bank_details else ""
 
-        html = f"""<!DOCTYPE html>
+        html = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8"/>
-    <title>Invoice - {sale['bill_no']}</title>
+    <title>Invoice - {{BILL_NO}}</title>
     <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 10px; color: #000; }}
-        .inv {{ max-width: 960px; margin: 0 auto; border: 2px solid #000; }}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 10px; color: #000; }
+        .inv { max-width: 960px; margin: 0 auto; border: 2px solid #000; }
 
         /* HEADER */
-        .hdr {{ display: flex; align-items: center; padding: 10px 14px; border-bottom: 2px solid #000; }}
-        .hdr .logo {{ flex: 0 0 90px; text-align: center; }}
-        .hdr .logo img {{ max-height: 75px; max-width: 80px; }}
-        .hdr .info {{ flex: 1; text-align: center; }}
-        .hdr .info h1 {{ font-size: 22px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }}
-        .hdr .info .loc {{ font-size: 12px; font-weight: bold; margin-bottom: 2px; }}
-        .hdr .info .contact {{ font-size: 10px; color: #333; }}
+        .hdr { display: flex; align-items: center; padding: 10px 14px; border-bottom: 2px solid #000; }
+        .hdr .logo { flex: 0 0 90px; text-align: center; }
+        .hdr .logo img { max-height: 75px; max-width: 80px; }
+        .hdr .info { flex: 1; text-align: center; }
+        .hdr .info h1 { font-size: 22px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
+        .hdr .info .loc { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+        .hdr .info .contact { font-size: 10px; color: #333; }
 
         /* META SECTION */
-        .meta {{ display: flex; border-bottom: 2px solid #000; font-size: 12px; }}
-        .meta-left {{ flex: 1; padding: 6px 12px; border-right: 1px solid #000; }}
-        .meta-right {{ flex: 1; padding: 6px 12px; }}
-        .meta td {{ padding: 1px 0; }}
-        .meta td.lbl {{ font-weight: bold; width: 120px; }}
-        .meta td.sep {{ width: 12px; text-align: center; }}
+        .meta { display: flex; border-bottom: 2px solid #000; font-size: 12px; }
+        .meta-left { flex: 1; padding: 6px 12px; border-right: 1px solid #000; }
+        .meta-right { flex: 1; padding: 6px 12px; }
+        .meta td { padding: 1px 0; }
+        .meta td.lbl { font-weight: bold; width: 120px; }
+        .meta td.sep { width: 12px; text-align: center; }
 
         /* TRANSPORT / CN ROW */
-        .transport-row {{ display: flex; border-bottom: 2px solid #000; font-size: 11px; padding: 3px 12px; }}
-        .transport-row span {{ margin-right: 30px; }}
+        .transport-row { display: flex; border-bottom: 2px solid #000; font-size: 11px; padding: 3px 12px; }
+        .transport-row span { margin-right: 30px; }
 
         /* ITEMS TABLE */
-        .items {{ width: 100%; border-collapse: collapse; }}
-        .items th {{ background: #e8e8e8; border: 1px solid #000; padding: 4px 3px; font-size: 10.5px; font-weight: bold; text-align: center; }}
-        .items td {{ border: 1px solid #999; padding: 3px 4px; font-size: 10.5px; }}
-        .items td.l {{ text-align: left; }}
-        .items td.r {{ text-align: right; }}
-        .items td.c {{ text-align: center; }}
+        .items { width: 100%; border-collapse: collapse; }
+        .items th { background: #e8e8e8; border: 1px solid #000; padding: 4px 3px; font-size: 10.5px; font-weight: bold; text-align: center; }
+        .items td { border: 1px solid #999; padding: 3px 4px; font-size: 10.5px; }
+        .items td.l { text-align: left; }
+        .items td.r { text-align: right; }
+        .items td.c { text-align: center; }
 
         /* TOTALS FOOTER */
-        .footer-row {{ display: flex; border-top: 2px solid #000; }}
-        .footer-left {{ flex: 1; padding: 6px 12px; font-size: 11px; border-right: 1px solid #000; }}
-        .footer-left .bank-title {{ font-weight: bold; margin-bottom: 2px; }}
-        .footer-right {{ flex: 0 0 290px; }}
-        .footer-right table {{ width: 100%; border-collapse: collapse; }}
-        .footer-right td {{ padding: 3px 8px; font-size: 12px; border-bottom: 1px solid #ccc; }}
-        .footer-right td.lbl {{ text-align: right; font-weight: bold; }}
-        .footer-right td.val {{ text-align: right; width: 110px; }}
-        .footer-right tr.net td {{ font-size: 13px; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; background: #f0f0f0; }}
+        .footer-row { display: flex; border-top: 2px solid #000; }
+        .footer-left { flex: 1; padding: 6px 12px; font-size: 11px; border-right: 1px solid #000; }
+        .footer-left .bank-title { font-weight: bold; margin-bottom: 2px; }
+        .footer-right { flex: 0 0 290px; }
+        .footer-right table { width: 100%; border-collapse: collapse; }
+        .footer-right td { padding: 3px 8px; font-size: 12px; border-bottom: 1px solid #ccc; }
+        .footer-right td.lbl { text-align: right; font-weight: bold; }
+        .footer-right td.val { text-align: right; width: 110px; }
+        .footer-right tr.net td { font-size: 13px; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; background: #f0f0f0; }
 
-        .words-row {{ padding: 4px 12px; font-size: 11px; border-top: 1px solid #000; font-style: italic; }}
-        .notice {{ padding: 4px 12px; font-size: 10px; text-align: right; color: #555; border-top: 1px solid #ddd; }}
+        .words-row { padding: 4px 12px; font-size: 11px; border-top: 1px solid #000; font-style: italic; }
+        .notice { padding: 4px 12px; font-size: 10px; text-align: right; color: #555; border-top: 1px solid #ddd; }
 
-        @media print {{
-            body {{ padding: 0; margin: 0; }}
-            .inv {{ border: none; }}
-            .no-print {{ display: none !important; }}
-            @page {{ margin: 5mm; }}
-        }}
+        @media print {
+            body { padding: 0; margin: 0; }
+            .inv { border: none; }
+            .no-print { display: none !important; }
+            @page { margin: 5mm; }
+        }
     </style>
 </head>
 <body>
 <script>
     window.onload = function() {
         window.print();
-        // Auto-close tab after print dialog closes
         window.addEventListener('afterprint', function() { window.close(); });
-        // Fallback: close when window regains focus (user cancelled print)
         setTimeout(function() { window.onfocus = function() { window.close(); }; }, 500);
     };
 </script>
@@ -672,13 +670,13 @@ class POSView(ft.Column):
 
     <!-- HEADER -->
     <div class="hdr">
-        <div class="logo">{logo_html}</div>
+        <div class="logo">{{LOGO_HTML}}</div>
         <div class="info">
-            <h1>{shop_name.upper()}</h1>
-            {"<div class='loc'>" + shop_address.upper() + "</div>" if shop_address else ""}
+            <h1>{{SHOP_NAME}}</h1>
+            {{LOC_HTML}}
             <div class="contact">
-                {email_phone_line}
-                {"<br/>" + pan_line if pan_line else ""}
+                {{CONTACT_HTML}}
+                {{PAN_LINE}}
             </div>
             <div style="font-size:16px; font-weight:bold; text-decoration:underline; margin-top:4px; letter-spacing:2px;">INVOICE</div>
         </div>
@@ -688,18 +686,18 @@ class POSView(ft.Column):
     <div class="meta">
         <div class="meta-left">
             <table>
-                <tr><td class="lbl">CUSTOMER NAME</td><td class="sep">:</td><td><b>{cust_name}</b></td></tr>
-                <tr><td class="lbl">Address</td><td class="sep">:</td><td>{cust_address}</td></tr>
-                <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td>{cust_pan}</td></tr>
-                <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td>{cust_phone}</td></tr>
+                <tr><td class="lbl">CUSTOMER NAME</td><td class="sep">:</td><td><b>{{CUST_NAME}}</b></td></tr>
+                <tr><td class="lbl">Address</td><td class="sep">:</td><td>{{CUST_ADDRESS}}</td></tr>
+                <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td>{{CUST_PAN}}</td></tr>
+                <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td>{{CUST_PHONE}}</td></tr>
             </table>
         </div>
         <div class="meta-right">
             <table>
-                <tr><td class="lbl">Invoice No.</td><td class="sep">:</td><td>{sale['bill_no']}</td></tr>
-                <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td>{bs_date}&nbsp;&nbsp;{ad_formatted}</td></tr>
-                <tr><td class="lbl">Bill Type</td><td class="sep">:</td><td>{sale['payment_type']}</td></tr>
-                <tr><td class="lbl">Transaction Date</td><td class="sep">:</td><td>{ad_formatted}</td></tr>
+                <tr><td class="lbl">Invoice No.</td><td class="sep">:</td><td>{{BILL_NO}}</td></tr>
+                <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td>{{BS_DATE}}&nbsp;&nbsp;{{AD_FORMATTED}}</td></tr>
+                <tr><td class="lbl">Bill Type</td><td class="sep">:</td><td>{{PAY_TYPE}}</td></tr>
+                <tr><td class="lbl">Transaction Date</td><td class="sep">:</td><td>{{AD_FORMATTED}}</td></tr>
             </table>
         </div>
     </div>
@@ -708,7 +706,7 @@ class POSView(ft.Column):
     <div class="transport-row">
         <span><b>Transport:</b> __________</span>
         <span><b>C.N. NO.:</b> __________</span>
-        <span style="margin-left:auto"><b>No. of Cases:</b> {len(sale['items'])}</span>
+        <span style="margin-left:auto"><b>No. of Cases:</b> {{NUM_ITEMS}}</span>
     </div>
 
     <!-- ITEMS TABLE -->
@@ -728,28 +726,28 @@ class POSView(ft.Column):
             </tr>
         </thead>
         <tbody>
-            {items_html}
+            {{ITEMS_HTML}}
         </tbody>
     </table>
 
     <!-- TOTALS FOOTER -->
     <div class="footer-row">
         <div class="footer-left">
-            {"<div class='bank-title'>Bank Details:</div><div>" + bank_html + "</div>" if bank_html else "&nbsp;"}
+            {{BANK_HTML_BLOCK}}
         </div>
         <div class="footer-right">
             <table>
-                <tr><td class="lbl">Sub Total</td><td class="val">{sale['subtotal']:,.2f}</td></tr>
-                <tr><td class="lbl">Discount Amount :</td><td class="val">{sale['discount']:,.2f}</td></tr>
-                <tr><td class="lbl">Round Off</td><td class="val">{round_off:,.2f}</td></tr>
-                <tr class="net"><td class="lbl">Net Amount (NPR) :</td><td class="val">{net_amount:,.2f}</td></tr>
+                <tr><td class="lbl">Sub Total</td><td class="val">{{SUBTOTAL}}</td></tr>
+                <tr><td class="lbl">Discount Amount :</td><td class="val">{{DISCOUNT}}</td></tr>
+                <tr><td class="lbl">Round Off</td><td class="val">{{ROUND_OFF}}</td></tr>
+                <tr class="net"><td class="lbl">Net Amount (NPR) :</td><td class="val">{{NET_AMOUNT}}</td></tr>
             </table>
         </div>
     </div>
 
     <!-- AMOUNT IN WORDS -->
     <div class="words-row">
-        <b>In Words:</b> Nepalese Rupees {amount_words} Only
+        <b>In Words:</b> Nepalese Rupees {{AMOUNT_WORDS}} Only
     </div>
 
     <!-- NOTICE -->
@@ -760,6 +758,30 @@ class POSView(ft.Column):
 </div>
 </body>
 </html>"""
+        # Replacements to avoid f-string escaping hell
+        html = html.replace("{{BILL_NO}}", sale['bill_no'])
+        html = html.replace("{{LOGO_HTML}}", logo_html)
+        html = html.replace("{{SHOP_NAME}}", shop_name.upper())
+        html = html.replace("{{LOC_HTML}}", f"<div class='loc'>{shop_address.upper()}</div>" if shop_address else "")
+        html = html.replace("{{CONTACT_HTML}}", email_phone_line)
+        html = html.replace("{{PAN_LINE}}", f"<br/>{pan_line}" if pan_line else "")
+        html = html.replace("{{CUST_NAME}}", cust_name)
+        html = html.replace("{{CUST_ADDRESS}}", cust_address)
+        html = html.replace("{{CUST_PAN}}", cust_pan)
+        html = html.replace("{{CUST_PHONE}}", cust_phone)
+        html = html.replace("{{BS_DATE}}", bs_date)
+        html = html.replace("{{AD_FORMATTED}}", ad_formatted)
+        html = html.replace("{{PAY_TYPE}}", sale['payment_type'])
+        html = html.replace("{{NUM_ITEMS}}", str(len(sale['items'])))
+        html = html.replace("{{ITEMS_HTML}}", items_html)
+        bank_block = f"<div class='bank-title'>Bank Details:</div><div>{bank_html}</div>" if bank_html else "&nbsp;"
+        html = html.replace("{{BANK_HTML_BLOCK}}", bank_block)
+        html = html.replace("{{SUBTOTAL}}", f"{sale['subtotal']:,.2f}")
+        html = html.replace("{{DISCOUNT}}", f"{sale['discount']:,.2f}")
+        html = html.replace("{{ROUND_OFF}}", f"{round_off:,.2f}")
+        html = html.replace("{{NET_AMOUNT}}", f"{net_amount:,.2f}")
+        html = html.replace("{{AMOUNT_WORDS}}", amount_words)
+
 
         # Write to temp file and open in browser for printing
         tmp_file = os.path.join(tempfile.gettempdir(), f"invoice_{sale['bill_no']}.html")
