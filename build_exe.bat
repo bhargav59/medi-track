@@ -31,7 +31,7 @@ if not exist ".venv" (
 
 REM Activate and install
 call .venv\Scripts\activate.bat
-pip install flet pyinstaller nepali-datetime
+pip install flet flet-desktop pyinstaller nepali-datetime
 
 REM Build the exe
 echo.

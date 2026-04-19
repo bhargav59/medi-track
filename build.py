@@ -35,6 +35,7 @@ def build():
         "--hidden-import", "views.settings",
         "--hidden-import", "nepali_datetime",
         "--hidden-import", "nepali_date",
+        "--hidden-import", "flet_desktop",
         "-y"
     ]
 
