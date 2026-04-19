@@ -80,6 +80,7 @@ def initialize_database():
             sale_id     INTEGER NOT NULL,
             stock_id    INTEGER NOT NULL,
             qty         INTEGER NOT NULL,
+            free_qty    INTEGER DEFAULT 0,
             unit_price  REAL    NOT NULL,
             FOREIGN KEY (sale_id)  REFERENCES Sales(id),
             FOREIGN KEY (stock_id) REFERENCES Stock(id)
@@ -277,8 +278,8 @@ def generate_bill_no():
 def create_sale(bill_no, subtotal, discount, grand_total, payment_type, items):
     """
     Create a sale record and its line-items.
-    items: list of dicts with keys: stock_id, qty, unit_price
-    Also reduces stock quantities automatically.
+    items: list of dicts with keys: stock_id, qty, free_qty, unit_price
+    Also reduces stock quantities (qty + free_qty) automatically.
     """
     conn = get_connection()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -290,14 +291,16 @@ def create_sale(bill_no, subtotal, discount, grand_total, payment_type, items):
     sale_id = cur.lastrowid
 
     for item in items:
+        free_qty = item.get("free_qty", 0)
         conn.execute(
-            "INSERT INTO SaleItems (sale_id, stock_id, qty, unit_price) VALUES (?, ?, ?, ?)",
-            (sale_id, item["stock_id"], item["qty"], item["unit_price"]),
+            "INSERT INTO SaleItems (sale_id, stock_id, qty, free_qty, unit_price) VALUES (?, ?, ?, ?, ?)",
+            (sale_id, item["stock_id"], item["qty"], free_qty, item["unit_price"]),
         )
-        # Auto-subtract stock
+        # Auto-subtract stock: paid qty + free qty both leave inventory
+        total_out = item["qty"] + free_qty
         conn.execute(
             "UPDATE Stock SET qty = qty - ? WHERE id = ?",
-            (item["qty"], item["stock_id"]),
+            (total_out, item["stock_id"]),
         )
 
     conn.commit()

@@ -47,7 +47,7 @@ class InventoryView(ft.Column):
         )
         self.new_product_name = ft.TextField(label="New Product Name", visible=False, border_radius=8)
         self.new_product_category = ft.TextField(label="Category", visible=False, border_radius=8)
-        self.new_product_hsn = ft.TextField(label="HSN Code", visible=False, border_radius=8)
+        self.new_product_hsn = ft.TextField(label="Batch No.", visible=False, border_radius=8)
         self.new_product_min_stock = ft.TextField(label="Min Stock Alert", value="10", visible=False, border_radius=8, keyboard_type=ft.KeyboardType.NUMBER)
         self.add_product_btn = ft.ElevatedButton(
             "Create New Product", icon=ft.Icons.ADD,
@@ -117,7 +117,7 @@ class InventoryView(ft.Column):
         # --- Stock table (no SP column) ---
         self.stock_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Product", weight=ft.FontWeight.W_600, size=12)),
+                ft.DataColumn(ft.Text("Product Name", weight=ft.FontWeight.W_600, size=12)),
                 ft.DataColumn(ft.Text("Batch", weight=ft.FontWeight.W_600, size=12)),
                 ft.DataColumn(ft.Text("MFG", weight=ft.FontWeight.W_600, size=12)),
                 ft.DataColumn(ft.Text("EXP", weight=ft.FontWeight.W_600, size=12)),

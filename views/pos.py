@@ -53,11 +53,12 @@ class POSView(ft.Column):
         # --- Cart table ---
         self.cart_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Product", weight=ft.FontWeight.W_600, size=12)),
+                ft.DataColumn(ft.Text("Product Name", weight=ft.FontWeight.W_600, size=12)),
                 ft.DataColumn(ft.Text("Batch", weight=ft.FontWeight.W_600, size=12)),
                 ft.DataColumn(ft.Text("MRP", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("Sell Price", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("Qty", weight=ft.FontWeight.W_600, size=12), numeric=True),
+                ft.DataColumn(ft.Text("Free", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("Total", weight=ft.FontWeight.W_600, size=12), numeric=True),
                 ft.DataColumn(ft.Text("", size=12)),
             ],
@@ -211,6 +212,7 @@ class POSView(ft.Column):
             "product_name": r["product_name"],
             "batch_no": r["batch_no"],
             "qty": 1,
+            "free_qty": 0,
             "unit_price": r["mrp"],  # Editable by user
             "mrp": r["mrp"],
             "max_qty": r["qty"],
@@ -236,6 +238,19 @@ class POSView(ft.Column):
                 on_submit=self._on_price_change,
             )
 
+            # Editable free qty field
+            free_field = ft.TextField(
+                value=str(item.get("free_qty", 0)),
+                width=55,
+                text_size=12,
+                content_padding=ft.padding.symmetric(horizontal=6, vertical=4),
+                border_radius=6,
+                keyboard_type=ft.KeyboardType.NUMBER,
+                data=i,
+                on_blur=self._on_free_change,
+                on_submit=self._on_free_change,
+            )
+
             rows.append(ft.DataRow(cells=[
                 ft.DataCell(ft.Text(item["product_name"], size=12)),
                 ft.DataCell(ft.Text(item["batch_no"], size=12)),
@@ -248,6 +263,7 @@ class POSView(ft.Column):
                     ft.IconButton(ft.Icons.ADD_CIRCLE_OUTLINE, icon_size=18,
                                   data=i, on_click=self._inc_qty, tooltip="Increase"),
                 ], spacing=0)),
+                ft.DataCell(free_field),
                 ft.DataCell(ft.Text(f"Rs. {line_total:.2f}", size=12, weight=ft.FontWeight.W_600)),
                 ft.DataCell(ft.IconButton(
                     ft.Icons.DELETE, icon_size=18, icon_color=ft.Colors.RED_600,
@@ -269,9 +285,27 @@ class POSView(ft.Column):
         except (ValueError, IndexError):
             pass
 
+    def _on_free_change(self, e):
+        """Update free qty when user edits it in the cart."""
+        idx = e.control.data
+        try:
+            free_val = int(float(e.control.value or 0))
+            if free_val < 0:
+                free_val = 0
+            # Ensure free + paid qty doesn't exceed stock
+            max_available = self.cart[idx]["max_qty"]
+            if self.cart[idx]["qty"] + free_val > max_available:
+                free_val = max(0, max_available - self.cart[idx]["qty"])
+                e.control.value = str(free_val)
+                e.control.update()
+            self.cart[idx]["free_qty"] = free_val
+        except (ValueError, IndexError):
+            pass
+
     def _inc_qty(self, e):
         idx = e.control.data
-        if self.cart[idx]["qty"] < self.cart[idx]["max_qty"]:
+        used = self.cart[idx]["qty"] + self.cart[idx].get("free_qty", 0)
+        if used < self.cart[idx]["max_qty"]:
             self.cart[idx]["qty"] += 1
         self._refresh_cart_ui()
 
@@ -325,7 +359,7 @@ class POSView(ft.Column):
         pay_type = self.payment_type.value or "Cash"
 
         items_for_db = [
-            {"stock_id": it["stock_id"], "qty": it["qty"], "unit_price": it["unit_price"]}
+            {"stock_id": it["stock_id"], "qty": it["qty"], "free_qty": it.get("free_qty", 0), "unit_price": it["unit_price"]}
             for it in self.cart
         ]
 
@@ -479,7 +513,7 @@ class POSView(ft.Column):
                 <td class="c">{item.get('batch_no', '')}</td>
                 <td class="c">{exp}</td>
                 <td class="c">{item['qty']}</td>
-                <td class="c">0.00</td>
+                <td class="c">{item.get('free_qty', 0)}</td>
                 <td class="r">{item['unit_price']:,.2f}</td>
                 <td class="r">{amount:,.2f}</td>
                 <td class="r">{mrp:,.2f}</td>
