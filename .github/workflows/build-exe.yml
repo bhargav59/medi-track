@@ -23,26 +23,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet pyinstaller nepali-datetime
 
-      - name: Build EXE with PyInstaller
-        run: |
-          pyinstaller --name "MediTrackNepal-Windows" `
-            --onedir `
-            --windowed `
-            --collect-all nepali_datetime `
-            --collect-all flet `
-            --collect-all flet_desktop `
-            --hidden-import flet `
-            --hidden-import flet_desktop `
-            --hidden-import nepali_date `
-            --hidden-import nepali_datetime `
-            --hidden-import views.dashboard `
-            --hidden-import views.inventory `
-            --hidden-import views.pos `
-            --hidden-import views.reports `
-            --hidden-import views.suppliers `
-            --hidden-import views.settings `
-            --clean `
-            main.py
+      - name: Build EXE with Flet Pack
+        run: python build.py
 
       - name: Upload EXE as artifact
         uses: actions/upload-artifact@v4

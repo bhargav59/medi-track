@@ -36,24 +36,7 @@ pip install flet pyinstaller nepali-datetime
 REM Build the exe
 echo.
 echo Building executable...
-pyinstaller --name "MediTrackNepal" ^
-    --onedir ^
-    --windowed ^
-    --collect-all nepali_datetime ^
-    --collect-all flet ^
-    --collect-all flet_desktop ^
-    --hidden-import flet ^
-    --hidden-import flet_desktop ^
-    --hidden-import nepali_date ^
-    --hidden-import nepali_datetime ^
-    --hidden-import views.dashboard ^
-    --hidden-import views.inventory ^
-    --hidden-import views.pos ^
-    --hidden-import views.reports ^
-    --hidden-import views.suppliers ^
-    --hidden-import views.settings ^
-    --clean ^
-    main.py
+python build.py
 
 echo.
 if exist "dist\MediTrackNepal" (
