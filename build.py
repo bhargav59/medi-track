@@ -17,8 +17,14 @@ def build():
     # 3. Construct flet pack command
     # Flet pack inherently understands flet and flet_desktop intricacies.
     # We only need to tell it about our custom views and dynamic data.
+    import shutil
+    flet_exe = shutil.which("flet")
+    if not flet_exe:
+        print("Error: flet command not found in PATH")
+        sys.exit(1)
+        
     cmd = [
-        "flet", "pack", "main.py",
+        flet_exe, "pack", "main.py",
         "--name", "MediTrackNepal-Windows",
         "--add-data", add_data_arg,
         "--hidden-import", "views.dashboard",
