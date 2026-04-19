@@ -658,7 +658,16 @@ class POSView(ft.Column):
         }}
     </style>
 </head>
-<body onload="window.print()">
+<body>
+<script>
+    window.onload = function() {
+        window.print();
+        // Auto-close tab after print dialog closes
+        window.addEventListener('afterprint', function() { window.close(); });
+        // Fallback: close when window regains focus (user cancelled print)
+        setTimeout(function() { window.onfocus = function() { window.close(); }; }, 500);
+    };
+</script>
 <div class="inv">
 
     <!-- HEADER -->
@@ -666,7 +675,7 @@ class POSView(ft.Column):
         <div class="logo">{logo_html}</div>
         <div class="info">
             <h1>{shop_name.upper()}</h1>
-            {"<div class='loc'>" + shop_address + "</div>" if shop_address else ""}
+            {"<div class='loc'>" + shop_address.upper() + "</div>" if shop_address else ""}
             <div class="contact">
                 {email_phone_line}
                 {"<br/>" + pan_line if pan_line else ""}
