@@ -621,9 +621,7 @@ class POSView(ft.Column):
 
         /* META SECTION */
         .meta {{ display: flex; border-bottom: 2px solid #000; font-size: 12px; }}
-        .meta-left {{ flex: 1; padding: 6px 12px; }}
-        .meta-center {{ flex: 0 0 120px; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; border-left: 1px solid #000; border-right: 1px solid #000; }}
-        .meta-center span {{ font-size: 16px; font-weight: bold; text-decoration: underline; }}
+        .meta-left {{ flex: 1; padding: 6px 12px; border-right: 1px solid #000; }}
         .meta-right {{ flex: 1; padding: 6px 12px; }}
         .meta td {{ padding: 1px 0; }}
         .meta td.lbl {{ font-weight: bold; width: 120px; }}
@@ -676,10 +674,11 @@ class POSView(ft.Column):
                 {email_phone_line}
                 {"<br/>" + pan_line if pan_line else ""}
             </div>
+            <div style="font-size:16px; font-weight:bold; text-decoration:underline; margin-top:4px; letter-spacing:2px;">INVOICE</div>
         </div>
     </div>
 
-    <!-- META: Customer (left) | INVOICE label (center) | Invoice details (right) -->
+    <!-- META: Customer (left) | Invoice details (right) -->
     <div class="meta">
         <div class="meta-left">
             <table>
@@ -688,9 +687,6 @@ class POSView(ft.Column):
                 <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td>{cust_pan}</td></tr>
                 <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td>{cust_phone}</td></tr>
             </table>
-        </div>
-        <div class="meta-center">
-            <span>INVOICE</span>
         </div>
         <div class="meta-right">
             <table>
