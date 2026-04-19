@@ -93,11 +93,11 @@ def initialize_database():
 
         CREATE TABLE IF NOT EXISTS ShopSettings (
             id            INTEGER PRIMARY KEY CHECK (id = 1),
-            shop_name     TEXT    DEFAULT 'Medi World Pharma Pvt. Ltd.',
-            shop_address  TEXT    DEFAULT 'Chhetrapath',
-            shop_phone    TEXT    DEFAULT '+977-9813362430/9851150097',
-            shop_email    TEXT    DEFAULT 'mediworldpharma2080@gmail.com',
-            shop_pan      TEXT    DEFAULT '619833862',
+            shop_name     TEXT    DEFAULT 'Kiran Pharmaceuticals Pvt. Ltd.',
+            shop_address  TEXT    DEFAULT 'Birgunj, Nepal',
+            shop_phone    TEXT    DEFAULT '+977-9824287599/9769333243',
+            shop_email    TEXT    DEFAULT 'kiranpharma2080@gmail.com',
+            shop_pan      TEXT    DEFAULT '',
             bank_details  TEXT    DEFAULT '',
             logo_path     TEXT    DEFAULT '',
             shop_dda      TEXT    DEFAULT ''
@@ -485,7 +485,7 @@ def get_shop_settings():
     row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
     if not row:
         conn.execute(
-            "INSERT INTO ShopSettings (id, shop_name) VALUES (1, 'Medi World Pharma Pvt. Ltd.')"
+            "INSERT INTO ShopSettings (id, shop_name, shop_phone) VALUES (1, 'Kiran Pharmaceuticals Pvt. Ltd.', '+977-9824287599/9769333243')"
         )
         conn.commit()
         row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
