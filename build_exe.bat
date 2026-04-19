@@ -40,6 +40,8 @@ pyinstaller --name "MediTrackNepal" ^
     --onedir ^
     --windowed ^
     --collect-all nepali_datetime ^
+    --collect-all flet ^
+    --collect-all flet_desktop ^
     --hidden-import flet ^
     --hidden-import flet_desktop ^
     --hidden-import nepali_date ^
