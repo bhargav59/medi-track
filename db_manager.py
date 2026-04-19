@@ -98,7 +98,7 @@ def initialize_database():
             shop_phone    TEXT    DEFAULT '+977-9824287599/9769333243',
             shop_email    TEXT    DEFAULT 'kiranpharma2080@gmail.com',
             shop_pan      TEXT    DEFAULT '',
-            bank_details  TEXT    DEFAULT '',
+            bank_details  TEXT    DEFAULT 'KIRAN PHARMACEUTICALS PRIVATE LIMITED\nA/C No.: 12801010005739\nGlobal IME Bank\nJORPATI BRANCH',
             logo_path     TEXT    DEFAULT '',
             shop_dda      TEXT    DEFAULT ''
         );
