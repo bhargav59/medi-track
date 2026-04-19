@@ -10,7 +10,10 @@ Compatible with flet 0.82+ (async FilePicker, page.services).
 """
 
 import flet as ft
+import os
+import shutil
 import sys
+from db_manager import get_shop_settings, save_shop_settings
 
 # Determine the application root directory (works in dev and as a compiled .exe)
 if getattr(sys, 'frozen', False):
