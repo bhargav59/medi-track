@@ -14,7 +14,8 @@ import os
 import base64
 import tempfile
 import webbrowser
-from datetime import datetime
+from datetime import datetime, date
+from nepali_date import ad_to_bs_string, get_dual_date
 from db_manager import (
     search_stock,
     generate_bill_no,
@@ -342,12 +343,58 @@ class POSView(ft.Column):
         self._refresh_cart_ui()
 
     def _complete_sale(self, e):
-        """Finalize the sale: save to DB, reduce stock, show bill."""
+        """Show customer details dialog before completing the sale."""
         if not self.cart:
             self.status_text.value = "❌ Cart is empty."
             self.status_text.color = ft.Colors.RED_700
             self.status_text.update()
             return
+
+        # Create customer detail fields
+        self._cust_name = ft.TextField(label="Customer Name", border_radius=8, autofocus=True)
+        self._cust_address = ft.TextField(label="Address", border_radius=8)
+        self._cust_pan = ft.TextField(label="PAN / VAT No.", border_radius=8)
+        self._cust_phone = ft.TextField(label="Phone No.", border_radius=8)
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Customer Details", weight=ft.FontWeight.BOLD),
+            content=ft.Column([
+                ft.Text("Enter customer details for the invoice (optional):", size=13, color=ft.Colors.GREY_600),
+                self._cust_name,
+                self._cust_address,
+                self._cust_pan,
+                self._cust_phone,
+            ], spacing=10, tight=True, width=400),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dlg)),
+                ft.ElevatedButton(
+                    "Complete Sale",
+                    icon=ft.Icons.CHECK_CIRCLE,
+                    on_click=lambda _: self._finalize_sale(dlg),
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self._page_ref.overlay.append(dlg)
+        dlg.open = True
+        self._page_ref.update()
+
+    def _close_dialog(self, dlg):
+        dlg.open = False
+        self._page_ref.update()
+
+    def _finalize_sale(self, dlg):
+        """Actually finalize the sale after customer dialog."""
+        cust_name = self._cust_name.value.strip() if self._cust_name.value else ""
+        cust_address = self._cust_address.value.strip() if self._cust_address.value else ""
+        cust_pan = self._cust_pan.value.strip() if self._cust_pan.value else ""
+        cust_phone = self._cust_phone.value.strip() if self._cust_phone.value else ""
+
+        # Close dialog
+        dlg.open = False
+        self._page_ref.update()
 
         subtotal = sum(item["qty"] * item["unit_price"] for item in self.cart)
         try:
@@ -363,7 +410,9 @@ class POSView(ft.Column):
             for it in self.cart
         ]
 
-        sale_id = create_sale(bill_no, subtotal, discount, grand_total, pay_type, items_for_db)
+        sale_id = create_sale(bill_no, subtotal, discount, grand_total, pay_type, items_for_db,
+                              customer_name=cust_name, customer_address=cust_address,
+                              customer_pan=cust_pan, customer_phone=cust_phone)
         self._last_sale_id = sale_id
 
         # Generate bill preview
@@ -476,12 +525,24 @@ class POSView(ft.Column):
                 pass
 
         inv_date = sale['timestamp']
+        # Generate BS date for invoice
+        inv_date_ad = inv_date[:10]  # YYYY-MM-DD
+        bs_date = ad_to_bs_string(inv_date_ad)
+        dual_date = get_dual_date(inv_date_ad)
+        # AD date formatted as MM/DD/YYYY
+        try:
+            ad_parts = inv_date_ad.split('-')
+            ad_formatted = f"{ad_parts[1]}/{ad_parts[2]}/{ad_parts[0]}"
+        except (IndexError, ValueError):
+            ad_formatted = inv_date_ad
+
+        # Customer details from sale
+        cust_name = sale.get('customer_name', '')
+        cust_address = sale.get('customer_address', '')
+        cust_pan = sale.get('customer_pan', '')
+        cust_phone = sale.get('customer_phone', '')
 
         # Build shop contact line
-        contact_parts = []
-        if shop_address:
-            contact_parts.append(shop_address)
-        contact_line = ""
         email_phone_line = ""
         if shop_email:
             email_phone_line += f"Email : {shop_email}"
@@ -622,10 +683,10 @@ class POSView(ft.Column):
     <div class="meta">
         <div class="meta-left">
             <table>
-                <tr><td class="lbl">CUSTOMER NAME</td><td class="sep">:</td><td></td></tr>
-                <tr><td class="lbl">Address</td><td class="sep">:</td><td></td></tr>
-                <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td></td></tr>
-                <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td></td></tr>
+                <tr><td class="lbl">CUSTOMER NAME</td><td class="sep">:</td><td><b>{cust_name}</b></td></tr>
+                <tr><td class="lbl">Address</td><td class="sep">:</td><td>{cust_address}</td></tr>
+                <tr><td class="lbl">PAN / VAT</td><td class="sep">:</td><td>{cust_pan}</td></tr>
+                <tr><td class="lbl">Phone No.</td><td class="sep">:</td><td>{cust_phone}</td></tr>
             </table>
         </div>
         <div class="meta-center">
@@ -634,9 +695,9 @@ class POSView(ft.Column):
         <div class="meta-right">
             <table>
                 <tr><td class="lbl">Invoice No.</td><td class="sep">:</td><td>{sale['bill_no']}</td></tr>
-                <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td>{inv_date}</td></tr>
+                <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td>{bs_date}&nbsp;&nbsp;{ad_formatted}</td></tr>
                 <tr><td class="lbl">Bill Type</td><td class="sep">:</td><td>{sale['payment_type']}</td></tr>
-                <tr><td class="lbl">Transaction Date</td><td class="sep">:</td><td>{inv_date[:10]}</td></tr>
+                <tr><td class="lbl">Transaction Date</td><td class="sep">:</td><td>{ad_formatted}</td></tr>
             </table>
         </div>
     </div>
@@ -672,9 +733,7 @@ class POSView(ft.Column):
     <!-- TOTALS FOOTER -->
     <div class="footer-row">
         <div class="footer-left">
-            {"<div class='bank-title'>Bank Details:</div><div>" + bank_html + "</div><br/>" if bank_html else ""}
-            <div style="margin-top:8px"><b>Your Current Balance</b></div>
-            <div style="font-size:16px; font-weight:bold; margin-top:2px;">{net_amount:,.2f}</div>
+            {"<div class='bank-title'>Bank Details:</div><div>" + bank_html + "</div>" if bank_html else "&nbsp;"}
         </div>
         <div class="footer-right">
             <table>
@@ -693,7 +752,7 @@ class POSView(ft.Column):
 
     <!-- NOTICE -->
     <div class="notice">
-        ...and lot bonus is not returnable.
+        Medicine once sold and lot bonus is not returnable.
     </div>
 
 </div>

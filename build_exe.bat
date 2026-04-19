@@ -40,8 +40,10 @@ pyinstaller --name "MediTrackNepal" ^
     --onedir ^
     --windowed ^
     --add-data "views;views" ^
+    --add-data "nepali_date.py;." ^
     --hidden-import flet ^
     --hidden-import flet_desktop ^
+    --hidden-import nepali_date ^
     --hidden-import views.dashboard ^
     --hidden-import views.inventory ^
     --hidden-import views.pos ^

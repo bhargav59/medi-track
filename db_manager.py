@@ -66,13 +66,17 @@ def initialize_database():
         );
 
         CREATE TABLE IF NOT EXISTS Sales (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            bill_no       TEXT    NOT NULL UNIQUE,
-            timestamp     TEXT    NOT NULL,
-            subtotal      REAL    DEFAULT 0.0,
-            discount      REAL    DEFAULT 0.0,
-            grand_total   REAL    DEFAULT 0.0,
-            payment_type  TEXT    DEFAULT 'Cash'
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            bill_no         TEXT    NOT NULL UNIQUE,
+            timestamp       TEXT    NOT NULL,
+            subtotal        REAL    DEFAULT 0.0,
+            discount        REAL    DEFAULT 0.0,
+            grand_total     REAL    DEFAULT 0.0,
+            payment_type    TEXT    DEFAULT 'Cash',
+            customer_name   TEXT    DEFAULT '',
+            customer_address TEXT   DEFAULT '',
+            customer_pan    TEXT    DEFAULT '',
+            customer_phone  TEXT    DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS SaleItems (
@@ -88,11 +92,11 @@ def initialize_database():
 
         CREATE TABLE IF NOT EXISTS ShopSettings (
             id            INTEGER PRIMARY KEY CHECK (id = 1),
-            shop_name     TEXT    DEFAULT 'Medical Store',
-            shop_address  TEXT    DEFAULT '',
-            shop_phone    TEXT    DEFAULT '',
-            shop_email    TEXT    DEFAULT '',
-            shop_pan      TEXT    DEFAULT '',
+            shop_name     TEXT    DEFAULT 'Medi World Pharma Pvt. Ltd.',
+            shop_address  TEXT    DEFAULT 'Chhetrapath',
+            shop_phone    TEXT    DEFAULT '+977-9813362430/9851150097',
+            shop_email    TEXT    DEFAULT 'mediworldpharma2080@gmail.com',
+            shop_pan      TEXT    DEFAULT '619833862',
             bank_details  TEXT    DEFAULT '',
             logo_path     TEXT    DEFAULT ''
         );
@@ -275,7 +279,8 @@ def generate_bill_no():
     return f"BILL-{today}-{seq:03d}"
 
 
-def create_sale(bill_no, subtotal, discount, grand_total, payment_type, items):
+def create_sale(bill_no, subtotal, discount, grand_total, payment_type, items,
+                customer_name="", customer_address="", customer_pan="", customer_phone=""):
     """
     Create a sale record and its line-items.
     items: list of dicts with keys: stock_id, qty, free_qty, unit_price
@@ -284,9 +289,11 @@ def create_sale(bill_no, subtotal, discount, grand_total, payment_type, items):
     conn = get_connection()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cur = conn.execute(
-        """INSERT INTO Sales (bill_no, timestamp, subtotal, discount, grand_total, payment_type)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (bill_no, timestamp, subtotal, discount, grand_total, payment_type),
+        """INSERT INTO Sales (bill_no, timestamp, subtotal, discount, grand_total, payment_type,
+               customer_name, customer_address, customer_pan, customer_phone)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (bill_no, timestamp, subtotal, discount, grand_total, payment_type,
+         customer_name, customer_address, customer_pan, customer_phone),
     )
     sale_id = cur.lastrowid
 
@@ -463,7 +470,7 @@ def get_shop_settings():
     row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
     if not row:
         conn.execute(
-            "INSERT INTO ShopSettings (id, shop_name) VALUES (1, 'Medical Store')"
+            "INSERT INTO ShopSettings (id, shop_name) VALUES (1, 'Medi World Pharma Pvt. Ltd.')"
         )
         conn.commit()
         row = conn.execute("SELECT * FROM ShopSettings WHERE id = 1").fetchone()
